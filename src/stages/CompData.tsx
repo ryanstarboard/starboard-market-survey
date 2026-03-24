@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Comp } from "../lib/types";
 import { CompCard } from "../components/CompCard";
+import ExcludeModal from "../components/ExcludeModal";
 
 interface CompDataProps {
   comps: Comp[];
@@ -49,6 +50,7 @@ function blankComp(): Comp {
 
 export default function CompData({ comps, onCompsChange }: CompDataProps) {
   const [excludedOpen, setExcludedOpen] = useState(false);
+  const [excludingCompId, setExcludingCompId] = useState<string | null>(null);
 
   const activeComps = comps.filter((c) => !c.excluded);
   const excludedComps = comps.filter((c) => c.excluded);
@@ -58,15 +60,19 @@ export default function CompData({ comps, onCompsChange }: CompDataProps) {
   };
 
   const handleExclude = (compId: string) => {
-    // For now, directly mark as excluded with a placeholder reason.
-    // In the future, this opens ExcludeModal.
+    setExcludingCompId(compId);
+  };
+
+  const confirmExclude = (reasons: string[]) => {
+    if (!excludingCompId) return;
     onCompsChange(
       comps.map((c) =>
-        c.id === compId
-          ? { ...c, excluded: true, excludeReasons: c.excludeReasons.length ? c.excludeReasons : ["Excluded by user"] }
+        c.id === excludingCompId
+          ? { ...c, excluded: true, excludeReasons: reasons }
           : c
       )
     );
+    setExcludingCompId(null);
   };
 
   const handleReinclude = (compId: string) => {
@@ -81,8 +87,17 @@ export default function CompData({ comps, onCompsChange }: CompDataProps) {
     onCompsChange([...comps, blankComp()]);
   };
 
+  const excludingComp = comps.find((c) => c.id === excludingCompId);
+
   return (
     <div className="space-y-4">
+      <ExcludeModal
+        isOpen={!!excludingCompId}
+        compName={excludingComp?.name || "this comp"}
+        onConfirm={confirmExclude}
+        onCancel={() => setExcludingCompId(null)}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
