@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { streamChat } from "../lib/api";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+const STAGE_PROMPTS: Record<number, string> = {
+  0: "You are helping a property manager with their rent roll data. They are uploading an AppFolio rent roll export. Help them understand the data: unit counts, average rents, occupancy, and trends. Be concise and practical.",
+  1: "You are helping a property manager evaluate comparable properties for a market survey. Help them assess whether comps are appropriate, compare rents and amenities, and identify outliers. Be concise and practical.",
+  2: "You are helping a property manager finalize their market survey. Help them review the data, note any gaps, and prepare for export. Be concise and practical.",
+};
 
 const STAGE_WELCOME: Record<number, string> = {
   0: "Welcome! Upload your rent roll to get started. I can help you understand the data once it's loaded.",
@@ -20,22 +27,78 @@ export default function ChatPanel({ stage }: ChatPanelProps) {
     { role: "assistant", content: STAGE_WELCOME[stage] ?? STAGE_WELCOME[0] },
   ]);
   const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<(() => void) | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Update welcome message when stage changes
+  const prevStageRef = useRef(stage);
+  useEffect(() => {
+    if (stage !== prevStageRef.current) {
+      prevStageRef.current = stage;
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: STAGE_WELCOME[stage] ?? "" },
+      ]);
+    }
+  }, [stage]);
+
+  const handleSend = useCallback(() => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || streaming) return;
 
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: text },
-      {
-        role: "assistant",
-        content:
-          "Chat is not connected to the AI yet. This will be wired up in a future phase.",
-      },
-    ]);
+    const userMsg: ChatMessage = { role: "user", content: text };
+    const assistantMsg: ChatMessage = { role: "assistant", content: "" };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput("");
-  };
+    setStreaming(true);
+
+    const allMessages = [...messages, userMsg].map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const abort = streamChat(
+      allMessages,
+      STAGE_PROMPTS[stage] ?? STAGE_PROMPTS[0],
+      (chunk) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: last.content + chunk,
+            };
+          }
+          return updated;
+        });
+      },
+      () => setStreaming(false),
+      (error) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last.role === "assistant" && !last.content) {
+            updated[updated.length - 1] = {
+              ...last,
+              content: `Error: ${error}`,
+            };
+          }
+          return updated;
+        });
+        setStreaming(false);
+      }
+    );
+
+    abortRef.current = abort;
+  }, [input, streaming, messages, stage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -68,10 +131,16 @@ export default function ChatPanel({ stage }: ChatPanelProps) {
                   : "bg-slate-100 text-slate-700"
               }`}
             >
-              {msg.content}
+              {msg.content || (
+                <span className="inline-flex items-center gap-1 text-slate-400">
+                  <span className="animate-pulse">Thinking</span>
+                  <span className="animate-bounce">...</span>
+                </span>
+              )}
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
@@ -83,11 +152,12 @@ export default function ChatPanel({ stage }: ChatPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask a question..."
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400"
+            disabled={streaming}
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-400 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!input.trim() || streaming}
             className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <svg
