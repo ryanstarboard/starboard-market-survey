@@ -13,7 +13,16 @@ function buildSystemPrompt(
   rentRoll: RentRollSummary | null,
   comps: Comp[]
 ): string {
-  let context = "You are a helpful real estate market survey assistant for Starboard Real Estate. Be concise and practical.\n\n";
+  let context = `You are a helpful real estate market survey assistant for Starboard Real Estate. Be concise and practical.
+
+CRITICAL RULES:
+- You already have all the property data and rent roll data shown below. NEVER ask the user for information you already have.
+- NEVER say you cannot search the web, cannot access databases, or cannot pull market data. Do not disclaim your abilities.
+- NEVER recommend external tools like CoStar, Yardi Matrix, RealPage, etc. The user has this app.
+- Comp searching is handled by the "Find Comps with AI" button in the app — that button uses web search to find real comps. Your job is to help ANALYZE data, answer questions, and provide insights about the data already loaded.
+- Be direct and actionable. Give specific answers based on the data you have.
+
+`;
 
   if (property) {
     context += `SUBJECT PROPERTY:\n- Name: ${property.name}\n- Address: ${property.address}\n- City: ${property.city}\n- Total Units: ${property.totalUnits}\n\n`;
@@ -47,7 +56,7 @@ function buildSystemPrompt(
         : "The user needs to upload their AppFolio rent roll. Help them with the process if they have questions.";
       break;
     case 1:
-      context += "Help the user evaluate comparable properties. You already know the subject property details and rent roll data above — never ask for this information. Help assess comps, compare rents, identify outliers.";
+      context += "The user is on the Comp Data stage. Help them evaluate comps, compare rents to the subject property, identify outliers, and assess whether comps are appropriate. The 'Find Comps with AI' button handles searching — your role is analysis and insights. If asked to find comps, tell them to use the green 'Find Comps with AI' button.";
       break;
     case 2:
       context += "Help the user finalize the survey. Review data completeness, note gaps, and help prepare for export.";
