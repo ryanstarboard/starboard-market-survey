@@ -4,11 +4,12 @@ import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
 import SubjectPropertyStage from "../stages/SubjectProperty";
 import CompData from "../stages/CompData";
+import MarketSummary from "../stages/MarketSummary";
 import SurveyMeta from "../stages/SurveyMeta";
 import { getProperties } from "./Home";
 import type { Property, SurveyState, RentRollSummary, SubjectProperty, Comp } from "../lib/types";
 
-const STAGES = ["Rent Roll", "Subject Property", "Comp Data", "Survey Completion"] as const;
+const STAGES = ["Rent Roll", "Subject Property", "Comp Data", "Market Summary", "Survey Completion"] as const;
 
 const SURVEY_STORAGE_PREFIX = "starboard_survey_";
 
@@ -39,7 +40,7 @@ function clearSavedSurvey(propertyId: string) {
 }
 
 type SurveyAction =
-  | { type: "SET_STAGE"; stage: 0 | 1 | 2 | 3 }
+  | { type: "SET_STAGE"; stage: 0 | 1 | 2 | 3 | 4 }
   | { type: "NEXT_STAGE" }
   | { type: "PREV_STAGE" }
   | { type: "SET_RENT_ROLL"; rentRoll: RentRollSummary | null }
@@ -56,7 +57,7 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
     case "NEXT_STAGE":
       return {
         ...state,
-        stage: Math.min(state.stage + 1, 3) as SurveyState["stage"],
+        stage: Math.min(state.stage + 1, 4) as SurveyState["stage"],
       };
     case "PREV_STAGE":
       return {
@@ -130,6 +131,15 @@ function StageContent({
         />
       );
     case 3:
+      return (
+        <MarketSummary
+          property={property}
+          subjectProperty={state.subjectProperty}
+          comps={state.comps}
+          rentRoll={state.rentRoll}
+        />
+      );
+    case 4:
       return (
         <SurveyMeta
           comps={state.comps}
@@ -252,7 +262,7 @@ export default function Survey() {
                   onClick={() =>
                     dispatch({
                       type: "SET_STAGE",
-                      stage: i as 0 | 1 | 2 | 3,
+                      stage: i as 0 | 1 | 2 | 3 | 4,
                     })
                   }
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
@@ -347,10 +357,10 @@ export default function Survey() {
             </div>
             <button
               onClick={() => dispatch({ type: "NEXT_STAGE" })}
-              disabled={state.stage === 3}
+              disabled={state.stage === 4}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {state.stage === 2 ? "Review & Export" : "Next"}
+              {state.stage === 3 ? "Review & Export" : "Next"}
             </button>
           </div>
 

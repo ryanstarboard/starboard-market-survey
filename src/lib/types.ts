@@ -146,7 +146,7 @@ export interface SubjectProperty {
 
 export interface SurveyState {
   propertyId: string;
-  stage: 0 | 1 | 2 | 3;
+  stage: 0 | 1 | 2 | 3 | 4;
   rentRoll: RentRollSummary | null;
   rrTab: "all" | "avgMI" | "recent" | "recentAvgMI";
   comps: Comp[];
