@@ -70,9 +70,29 @@ Search the web for 5-7 comparable apartment communities near this property. Get 
       }
     }
 
-    const cleaned = text.replace(/^```json?\n?/m, "").replace(/\n?```$/m, "").trim();
+    // Extract JSON array from response — Claude may wrap it in conversational text
+    let parsed;
+    // Try 1: raw parse
+    try {
+      parsed = JSON.parse(text.trim());
+    } catch {
+      // Try 2: strip markdown fences
+      const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+      if (fenceMatch) {
+        parsed = JSON.parse(fenceMatch[1].trim());
+      } else {
+        // Try 3: find the JSON array in the text
+        const arrayMatch = text.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+          parsed = JSON.parse(arrayMatch[0]);
+        } else {
+          throw new Error("Could not extract JSON from AI response");
+        }
+      }
+    }
 
-    res.json({ suggestions: JSON.parse(cleaned) });
+    const suggestions = Array.isArray(parsed) ? parsed : [parsed];
+    res.json({ suggestions });
   } catch (err: unknown) {
     const error = err as Error;
     console.error("Claude comp-suggestions error:", error.message);
