@@ -1,4 +1,4 @@
-import { useReducer } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
@@ -10,6 +10,34 @@ import type { Property, SurveyState, RentRollSummary, SubjectProperty, Comp } fr
 
 const STAGES = ["Rent Roll", "Subject Property", "Comp Data", "Survey Completion"] as const;
 
+const SURVEY_STORAGE_PREFIX = "starboard_survey_";
+
+function saveSurvey(propertyId: string, state: SurveyState) {
+  try {
+    localStorage.setItem(SURVEY_STORAGE_PREFIX + propertyId, JSON.stringify(state));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
+
+function loadSurvey(propertyId: string): SurveyState | null {
+  try {
+    const raw = localStorage.getItem(SURVEY_STORAGE_PREFIX + propertyId);
+    if (raw) return JSON.parse(raw) as SurveyState;
+  } catch {
+    // corrupt data
+  }
+  return null;
+}
+
+export function hasSavedSurvey(propertyId: string): boolean {
+  return localStorage.getItem(SURVEY_STORAGE_PREFIX + propertyId) !== null;
+}
+
+function clearSavedSurvey(propertyId: string) {
+  localStorage.removeItem(SURVEY_STORAGE_PREFIX + propertyId);
+}
+
 type SurveyAction =
   | { type: "SET_STAGE"; stage: 0 | 1 | 2 | 3 }
   | { type: "NEXT_STAGE" }
@@ -18,7 +46,8 @@ type SurveyAction =
   | { type: "SET_RR_TAB"; tab: SurveyState["rrTab"] }
   | { type: "SET_COMPS"; comps: Comp[] }
   | { type: "SET_SUBJECT_PROPERTY"; subjectProperty: SubjectProperty }
-  | { type: "SET_FIELD"; field: "preparedBy" | "surveyDate" | "comments"; value: string };
+  | { type: "SET_FIELD"; field: "preparedBy" | "surveyDate" | "comments"; value: string }
+  | { type: "CLEAR_SURVEY"; propertyId: string };
 
 function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
   switch (action.type) {
@@ -44,6 +73,18 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
       return { ...state, subjectProperty: action.subjectProperty };
     case "SET_FIELD":
       return { ...state, [action.field]: action.value };
+    case "CLEAR_SURVEY":
+      return {
+        propertyId: action.propertyId,
+        stage: 0 as const,
+        rentRoll: null,
+        rrTab: "all" as const,
+        comps: [],
+        subjectProperty: null,
+        preparedBy: "",
+        surveyDate: new Date().toISOString().slice(0, 10),
+        comments: "",
+      };
     default:
       return state;
   }
@@ -111,18 +152,36 @@ export default function Survey() {
   const navigate = useNavigate();
 
   const property = getProperties().find((p) => p.id === propertyId) ?? null;
+  const pid = propertyId || "";
 
-  const [state, dispatch] = useReducer(surveyReducer, {
-    propertyId: propertyId || "",
-    stage: 0,
-    rentRoll: null,
-    rrTab: "all",
-    comps: [],
-    subjectProperty: null,
-    preparedBy: "",
-    surveyDate: new Date().toISOString().slice(0, 10),
-    comments: "",
-  } satisfies SurveyState);
+  const [state, dispatch] = useReducer(
+    surveyReducer,
+    pid,
+    (id): SurveyState =>
+      loadSurvey(id) ?? {
+        propertyId: id,
+        stage: 0,
+        rentRoll: null,
+        rrTab: "all",
+        comps: [],
+        subjectProperty: null,
+        preparedBy: "",
+        surveyDate: new Date().toISOString().slice(0, 10),
+        comments: "",
+      }
+  );
+
+  // Auto-save on every state change
+  useEffect(() => {
+    if (pid) saveSurvey(pid, state);
+  }, [pid, state]);
+
+  const handleClearSurvey = useCallback(() => {
+    if (pid) {
+      clearSavedSurvey(pid);
+      dispatch({ type: "CLEAR_SURVEY", propertyId: pid });
+    }
+  }, [pid]);
 
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
@@ -205,7 +264,13 @@ export default function Survey() {
             ))}
           </div>
 
-          <div className="w-20" />
+          <button
+            onClick={handleClearSurvey}
+            className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+            title="Clear all survey data and start fresh"
+          >
+            Clear Survey
+          </button>
         </div>
       </div>
 

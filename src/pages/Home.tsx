@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Property } from "../lib/types";
 import PropertyModal from "../components/PropertyModal";
+import { hasSavedSurvey } from "./Survey";
 
 const STORAGE_KEY = "starboard_properties";
 
@@ -194,17 +195,24 @@ export default function Home() {
                 <span className="text-sm font-medium text-slate-700">
                   {property.totalUnits} units
                 </span>
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    property.lastSurveyDate
-                      ? "bg-green-50 text-green-700 border border-green-200"
-                      : "bg-slate-100 text-slate-500 border border-slate-200"
-                  }`}
-                >
-                  {property.lastSurveyDate
-                    ? `Last survey: ${formatDate(property.lastSurveyDate)}`
-                    : "No prior survey"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {hasSavedSurvey(property.id) && (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      In Progress
+                    </span>
+                  )}
+                  <span
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                      property.lastSurveyDate
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-slate-100 text-slate-500 border border-slate-200"
+                    }`}
+                  >
+                    {property.lastSurveyDate
+                      ? `Last survey: ${formatDate(property.lastSurveyDate)}`
+                      : "No prior survey"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
