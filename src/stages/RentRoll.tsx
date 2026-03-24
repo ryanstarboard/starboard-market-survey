@@ -165,9 +165,13 @@ function UploadArea({
           <ol className="text-sm text-slate-600 space-y-1.5 list-decimal list-inside">
             <li>Log in to AppFolio</li>
             <li>
-              Go to <span className="font-medium text-slate-700">Reports</span>{" "}
-              &gt;{" "}
-              <span className="font-medium text-slate-700">Rent Roll</span>
+              Search for{" "}
+              <span className="font-medium text-slate-700">Market Survey</span>
+            </li>
+            <li>
+              Navigate to the{" "}
+              <span className="font-medium text-slate-700">Market Survey Rent Roll</span>{" "}
+              report
             </li>
             <li>Select the property</li>
             <li>
