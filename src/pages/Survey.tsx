@@ -1,14 +1,20 @@
 import { useReducer } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ChatPanel from "../components/ChatPanel";
-import type { SurveyState } from "../lib/types";
+import RentRoll from "../stages/RentRoll";
+import CompData from "../stages/CompData";
+import type { SurveyState, RentRollSummary, Comp } from "../lib/types";
 
 const STAGES = ["Rent Roll", "Comp Data", "Survey Completion"] as const;
 
 type SurveyAction =
   | { type: "SET_STAGE"; stage: 0 | 1 | 2 }
   | { type: "NEXT_STAGE" }
-  | { type: "PREV_STAGE" };
+  | { type: "PREV_STAGE" }
+  | { type: "SET_RENT_ROLL"; rentRoll: RentRollSummary | null }
+  | { type: "SET_RR_TAB"; tab: SurveyState["rrTab"] }
+  | { type: "SET_COMPS"; comps: Comp[] }
+  | { type: "SET_FIELD"; field: "preparedBy" | "surveyDate" | "comments"; value: string };
 
 function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
   switch (action.type) {
@@ -24,73 +30,44 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
         ...state,
         stage: Math.max(state.stage - 1, 0) as SurveyState["stage"],
       };
+    case "SET_RENT_ROLL":
+      return { ...state, rentRoll: action.rentRoll };
+    case "SET_RR_TAB":
+      return { ...state, rrTab: action.tab };
+    case "SET_COMPS":
+      return { ...state, comps: action.comps };
+    case "SET_FIELD":
+      return { ...state, [action.field]: action.value };
     default:
       return state;
   }
 }
 
-function StageContent({ stage }: { stage: number }) {
-  switch (stage) {
+function StageContent({
+  state,
+  dispatch,
+}: {
+  state: SurveyState;
+  dispatch: React.Dispatch<SurveyAction>;
+}) {
+  switch (state.stage) {
     case 0:
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">
-              Upload Rent Roll
-            </h3>
-            <p className="text-sm text-slate-500 max-w-sm">
-              Upload your AppFolio rent roll export (.xlsx) to begin the survey.
-              The file will be parsed locally to extract unit data.
-            </p>
-            <button className="mt-6 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-              Choose File
-            </button>
-          </div>
-        </div>
+        <RentRoll
+          rentRoll={state.rentRoll}
+          rrTab={state.rrTab}
+          onRentRollParsed={(summary) =>
+            dispatch({ type: "SET_RENT_ROLL", rentRoll: summary })
+          }
+          onTabChange={(tab) => dispatch({ type: "SET_RR_TAB", tab })}
+        />
       );
     case 1:
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">
-              Comparable Properties
-            </h3>
-            <p className="text-sm text-slate-500 max-w-sm">
-              Upload a rent roll first, then AI will suggest comparable
-              properties for your survey.
-            </p>
-          </div>
-        </div>
+        <CompData
+          comps={state.comps}
+          onCompsChange={(comps) => dispatch({ type: "SET_COMPS", comps })}
+        />
       );
     case 2:
       return (
@@ -222,21 +199,19 @@ export default function Survey() {
             ))}
           </div>
 
-          <div className="w-20" /> {/* Spacer for centering */}
+          <div className="w-20" />
         </div>
       </div>
 
       {/* Main content area: chat panel + stage content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chat panel — left sidebar */}
         <div className="w-[350px] flex-shrink-0">
           <ChatPanel stage={state.stage} />
         </div>
 
-        {/* Stage content — right side */}
         <div className="flex-1 flex flex-col overflow-y-auto">
           <div className="flex-1 flex flex-col p-6">
-            <StageContent stage={state.stage} />
+            <StageContent state={state} dispatch={dispatch} />
           </div>
 
           {/* Navigation buttons */}
