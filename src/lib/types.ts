@@ -47,6 +47,12 @@ export interface RentRollSummary {
 
 // ── Comps ────────────────────────────────────────────────────────────────────
 
+export interface OtherFee {
+  name: string;
+  amount: number | null;
+  type: 'move-in' | 'monthly';
+}
+
 export interface FloorPlan {
   type: string;
   sqft: number | null;
@@ -65,15 +71,22 @@ export interface Comp {
   phone: string;
 
   totalUnits: number;
+  yearBuilt: string | null;
   leasedPct: number | null;
   occupancyPct: number | null;
   applicationFee: number | null;
   adminFee: number | null;
+  securityDeposit: number | null;
   mtmFee: number | null;
   corporateUnits: boolean | null;
+  furnished: boolean | null;
   residentReferrals: boolean | null;
+  referralAmount: number | null;
   leaseTerms: string;
   utilitiesIncluded: string;
+  otherFees: OtherFee[];
+  communityAmenities: string[];
+  unitAmenities: string[];
 
   petLimit: string;
   petDeposit: number | null;

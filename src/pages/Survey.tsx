@@ -4,8 +4,8 @@ import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
 import CompData from "../stages/CompData";
 import SurveyMeta from "../stages/SurveyMeta";
-import { SAMPLE_PROPERTIES } from "./Home";
-import type { SurveyState, RentRollSummary, Comp } from "../lib/types";
+import { getProperties } from "./Home";
+import type { Property, SurveyState, RentRollSummary, Comp } from "../lib/types";
 
 const STAGES = ["Rent Roll", "Comp Data", "Survey Completion"] as const;
 
@@ -52,7 +52,7 @@ function StageContent({
 }: {
   state: SurveyState;
   dispatch: React.Dispatch<SurveyAction>;
-  property: ReturnType<typeof SAMPLE_PROPERTIES.find> | null;
+  property: Property | null;
 }) {
   switch (state.stage) {
     case 0:
@@ -97,7 +97,7 @@ export default function Survey() {
   const { propertyId } = useParams<{ propertyId: string }>();
   const navigate = useNavigate();
 
-  const property = SAMPLE_PROPERTIES.find((p) => p.id === propertyId) ?? null;
+  const property = getProperties().find((p) => p.id === propertyId) ?? null;
 
   const [state, dispatch] = useReducer(surveyReducer, {
     propertyId: propertyId || "",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Comp } from "../lib/types";
+import type { Comp, OtherFee } from "../lib/types";
 import { FloorPlanTable } from "./FloorPlanTable";
 
 interface CompCardProps {
@@ -37,6 +37,22 @@ function sourceBadge(source: string) {
     </span>
   );
 }
+
+// ── Amenity Options ─────────────────────────────────────────────────────────
+
+const COMMUNITY_AMENITIES = [
+  "Pool", "Fitness Center", "Clubhouse", "Business Center", "Dog Park",
+  "Playground", "BBQ/Grill Area", "Package Lockers", "EV Charging",
+  "Gated Access", "Garage Parking", "Covered Parking", "Storage Units",
+  "On-Site Laundry", "Bike Storage",
+];
+
+const UNIT_AMENITIES = [
+  "Washer/Dryer", "W/D Hookups", "Dishwasher", "Microwave",
+  "Stainless Appliances", "Granite/Quartz Counters", "Hardwood/Vinyl Plank",
+  "Carpet", "Patio/Balcony", "Walk-In Closet", "Fireplace", "Central AC",
+  "Smart Thermostat", "USB Outlets",
+];
 
 // ── Inline Editable Fields ───────────────────────────────────────────────────
 
@@ -188,6 +204,134 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
+// ── Amenity Pill Grid ────────────────────────────────────────────────────────
+
+function AmenityGrid({
+  options,
+  selected,
+  onChange,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (updated: string[]) => void;
+}) {
+  const toggle = (name: string) => {
+    if (selected.includes(name)) {
+      onChange(selected.filter((s) => s !== name));
+    } else {
+      onChange([...selected, name]);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {options.map((name) => {
+        const isOn = selected.includes(name);
+        return (
+          <button
+            key={name}
+            onClick={() => toggle(name)}
+            className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+              isOn
+                ? "bg-blue-500 text-white border-blue-500"
+                : "bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            {name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Other Fees Editor ────────────────────────────────────────────────────────
+
+function OtherFeesEditor({
+  fees,
+  onChange,
+}: {
+  fees: OtherFee[];
+  onChange: (updated: OtherFee[]) => void;
+}) {
+  const updateFee = (index: number, patch: Partial<OtherFee>) => {
+    const updated = fees.map((f, i) => (i === index ? { ...f, ...patch } : f));
+    onChange(updated);
+  };
+
+  const addFee = () => {
+    onChange([...fees, { name: "", amount: null, type: "monthly" }]);
+  };
+
+  const removeFee = (index: number) => {
+    onChange(fees.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2 mt-1">
+      {fees.map((fee, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            className="border border-slate-300 rounded px-2 py-1 text-sm w-36 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-400"
+            placeholder="Fee name"
+            value={fee.name}
+            onChange={(e) => updateFee(i, { name: e.target.value })}
+          />
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-slate-500">$</span>
+            <input
+              type="number"
+              className="border border-slate-300 rounded px-2 py-1 text-sm w-20 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-400"
+              placeholder="0"
+              value={fee.amount !== null ? String(fee.amount) : ""}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                updateFee(i, { amount: raw === "" ? null : Number(raw) });
+              }}
+            />
+          </div>
+          <div className="flex rounded-full border border-slate-300 overflow-hidden text-xs">
+            <button
+              onClick={() => updateFee(i, { type: "move-in" })}
+              className={`px-2.5 py-1 transition-colors ${
+                fee.type === "move-in"
+                  ? "bg-blue-500 text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              Move-in
+            </button>
+            <button
+              onClick={() => updateFee(i, { type: "monthly" })}
+              className={`px-2.5 py-1 transition-colors ${
+                fee.type === "monthly"
+                  ? "bg-blue-500 text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              Monthly
+            </button>
+          </div>
+          <button
+            onClick={() => removeFee(i)}
+            className="text-slate-400 hover:text-red-500 transition-colors text-sm font-bold ml-1"
+            title="Remove fee"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={addFee}
+        className="px-3 py-1 text-xs font-medium text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition-colors"
+      >
+        + Add Fee
+      </button>
+    </div>
+  );
+}
+
 // ── CompCard ─────────────────────────────────────────────────────────────────
 
 export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
@@ -255,7 +399,7 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
       </div>
 
       <div className="px-4 py-3 space-y-1">
-        {/* ── Header Section ── */}
+        {/* ── 1. Location & Contact ── */}
         <SectionHeader title="Location & Contact" />
         <div className="grid grid-cols-2 gap-x-6">
           <FieldRow label="Address">
@@ -272,11 +416,14 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
           </FieldRow>
         </div>
 
-        {/* ── Property Info ── */}
+        {/* ── 2. Property Info ── */}
         <SectionHeader title="Property Info" />
         <div className="grid grid-cols-3 gap-x-6">
           <FieldRow label="Total Units">
             <EditableNumber value={comp.totalUnits} onChange={(v) => update("totalUnits", v ?? 0)} />
+          </FieldRow>
+          <FieldRow label="Year Built">
+            <EditableText value={comp.yearBuilt || ""} onChange={(v) => update("yearBuilt", v || null)} placeholder="e.g. 2005" />
           </FieldRow>
           <FieldRow label="Leased %">
             <EditableNumber value={comp.leasedPct} onChange={(v) => update("leasedPct", v)} suffix="%" />
@@ -284,28 +431,93 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
           <FieldRow label="Occupancy %">
             <EditableNumber value={comp.occupancyPct} onChange={(v) => update("occupancyPct", v)} suffix="%" />
           </FieldRow>
+          <FieldRow label="Lease Terms">
+            <EditableText value={comp.leaseTerms} onChange={(v) => update("leaseTerms", v)} placeholder="e.g. 3, 6, 12 mo" />
+          </FieldRow>
+        </div>
+        <div className="flex gap-6 mt-1">
+          <EditableToggle label="Renovated" value={comp.renovated} onChange={(v) => update("renovated", v)} />
+          {comp.renovated && (
+            <FieldRow label="Reno Date">
+              <EditableText value={comp.renoDate || ""} onChange={(v) => update("renoDate", v || null)} placeholder="e.g. 2023" />
+            </FieldRow>
+          )}
+          <EditableToggle label="Furnished" value={comp.furnished} onChange={(v) => update("furnished", v)} />
+          <EditableToggle label="Corporate Units" value={comp.corporateUnits} onChange={(v) => update("corporateUnits", v)} />
+        </div>
+
+        {/* ── 3. Floor Plans ── */}
+        <SectionHeader title="Floor Plans" />
+        <FloorPlanTable
+          floorPlans={comp.floorPlans}
+          onChange={(plans) => update("floorPlans", plans)}
+        />
+
+        {/* ── 4. Cost to Rent ── */}
+        <SectionHeader title="Cost to Rent" />
+        <div className="grid grid-cols-3 gap-x-6">
           <FieldRow label="Application Fee">
             <EditableCurrency value={comp.applicationFee} onChange={(v) => update("applicationFee", v)} />
           </FieldRow>
           <FieldRow label="Admin Fee">
             <EditableCurrency value={comp.adminFee} onChange={(v) => update("adminFee", v)} />
           </FieldRow>
+          <FieldRow label="Security Deposit">
+            <EditableCurrency value={comp.securityDeposit} onChange={(v) => update("securityDeposit", v)} />
+          </FieldRow>
           <FieldRow label="MTM Fee">
             <EditableCurrency value={comp.mtmFee} onChange={(v) => update("mtmFee", v)} />
-          </FieldRow>
-          <FieldRow label="Lease Terms">
-            <EditableText value={comp.leaseTerms} onChange={(v) => update("leaseTerms", v)} placeholder="e.g. 3, 6, 12 mo" />
           </FieldRow>
           <FieldRow label="Utilities Incl.">
             <EditableText value={comp.utilitiesIncluded} onChange={(v) => update("utilitiesIncluded", v)} placeholder="e.g. Water/Trash" />
           </FieldRow>
         </div>
-        <div className="flex gap-6 mt-1">
-          <EditableToggle label="Corporate Units" value={comp.corporateUnits} onChange={(v) => update("corporateUnits", v)} />
-          <EditableToggle label="Resident Referrals" value={comp.residentReferrals} onChange={(v) => update("residentReferrals", v)} />
+        <div className="mt-2">
+          <span className="text-xs font-medium text-slate-500">Other Fees</span>
+          <OtherFeesEditor
+            fees={comp.otherFees}
+            onChange={(fees) => update("otherFees", fees)}
+          />
         </div>
 
-        {/* ── Pets ── */}
+        {/* ── 5. Specials ── */}
+        <SectionHeader title="Specials" />
+        <div className="grid grid-cols-2 gap-x-6">
+          <FieldRow label="Concessions">
+            <EditableText value={comp.concessions} onChange={(v) => update("concessions", v)} placeholder="e.g. 1 month free" />
+          </FieldRow>
+        </div>
+        <div className="flex items-center gap-4 mt-1">
+          <EditableToggle label="Resident Referrals" value={comp.residentReferrals} onChange={(v) => update("residentReferrals", v)} />
+          {comp.residentReferrals && (
+            <FieldRow label="Referral Amount">
+              <EditableCurrency value={comp.referralAmount} onChange={(v) => update("referralAmount", v)} placeholder="Amount" />
+            </FieldRow>
+          )}
+        </div>
+
+        {/* ── 6. Amenities ── */}
+        <SectionHeader title="Amenities" />
+        <div className="space-y-3">
+          <div>
+            <span className="text-xs font-medium text-slate-500">Community Amenities</span>
+            <AmenityGrid
+              options={COMMUNITY_AMENITIES}
+              selected={comp.communityAmenities}
+              onChange={(v) => update("communityAmenities", v)}
+            />
+          </div>
+          <div>
+            <span className="text-xs font-medium text-slate-500">In-Unit Amenities</span>
+            <AmenityGrid
+              options={UNIT_AMENITIES}
+              selected={comp.unitAmenities}
+              onChange={(v) => update("unitAmenities", v)}
+            />
+          </div>
+        </div>
+
+        {/* ── 7. Pets ── */}
         <SectionHeader title="Pets" />
         <div className="grid grid-cols-3 gap-x-6">
           <FieldRow label="Pet Limit">
@@ -320,34 +532,16 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
           <FieldRow label="Pet Fee">
             <EditableCurrency value={comp.petFee} onChange={(v) => update("petFee", v)} />
           </FieldRow>
-          <FieldRow label="Pet Rules" >
+          <FieldRow label="Pet Rules">
             <EditableText value={comp.petRules} onChange={(v) => update("petRules", v)} placeholder="Rules" className="w-full" />
           </FieldRow>
         </div>
 
-        {/* ── Condition ── */}
-        <SectionHeader title="Condition" />
-        <div className="grid grid-cols-2 gap-x-6">
-          <div className="flex gap-6 items-center py-1">
-            <EditableToggle label="Renovated" value={comp.renovated} onChange={(v) => update("renovated", v)} />
-          </div>
-          <FieldRow label="Reno Date">
-            <EditableText value={comp.renoDate || ""} onChange={(v) => update("renoDate", v || null)} placeholder="e.g. 2023" />
-          </FieldRow>
-          <FieldRow label="Concessions">
-            <EditableText value={comp.concessions} onChange={(v) => update("concessions", v)} placeholder="Concessions" />
-          </FieldRow>
-          <FieldRow label="Other Notes">
-            <EditableText value={comp.otherNotes} onChange={(v) => update("otherNotes", v)} placeholder="Notes" />
-          </FieldRow>
-        </div>
-
-        {/* ── Floor Plans ── */}
-        <SectionHeader title="Floor Plans" />
-        <FloorPlanTable
-          floorPlans={comp.floorPlans}
-          onChange={(plans) => update("floorPlans", plans)}
-        />
+        {/* ── 8. Notes ── */}
+        <SectionHeader title="Notes" />
+        <FieldRow label="Other Notes">
+          <EditableText value={comp.otherNotes} onChange={(v) => update("otherNotes", v)} placeholder="Notes" />
+        </FieldRow>
       </div>
     </div>
   );
