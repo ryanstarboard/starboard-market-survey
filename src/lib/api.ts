@@ -12,6 +12,14 @@ export interface CompSuggestion {
   leaseTerms: string;
   utilitiesIncluded: string;
   reasoning: string;
+  floorPlans?: { type: string; sqft: number; rent: number }[];
+  leasedPct?: number;
+  applicationFee?: number;
+  adminFee?: number;
+  petDeposit?: number;
+  petRent?: number;
+  concessions?: string;
+  yearBuilt?: string;
 }
 
 // ── Comp Suggestions ────────────────────────────────────────────────────────

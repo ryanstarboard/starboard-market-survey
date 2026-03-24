@@ -17,20 +17,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system:
-        "You are a real estate market analyst. Given a subject property, suggest 5-7 comparable apartment communities nearby. Return a JSON array of comp objects. Each object should have: name, address, cityState, distanceFromSubject, phone, totalUnits, leaseTerms, utilitiesIncluded, and a reasoning field explaining why this is a good comp. Only return valid JSON — no markdown fences.",
+      max_tokens: 16000,
+      tools: [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 10,
+        },
+      ],
+      system: `You are a real estate market analyst finding comparable apartment communities for a market survey.
+
+IMPORTANT: Use web search to find REAL, CURRENT data. Search for apartment communities near the subject property on sites like Apartments.com, Zillow, and property websites. Get actual rent prices, unit counts, and amenity details.
+
+For each comp, search for its current rent prices by unit type (studio, 1BR, 2BR, 3BR etc).
+
+After searching, return your results as a JSON array. Each object must have:
+- name: property name
+- address: street address
+- cityState: "City, ST"
+- distanceFromSubject: approximate distance (e.g. "0.5 miles")
+- phone: phone number if found
+- totalUnits: number of units
+- leaseTerms: available lease terms
+- utilitiesIncluded: which utilities are included
+- floorPlans: array of {type: "1BR/1BA", sqft: number, rent: number} with actual current rents
+- leasedPct: occupancy/leased percentage if available
+- applicationFee: application fee if found
+- adminFee: admin fee if found
+- petDeposit: pet deposit if found
+- petRent: monthly pet rent if found
+- concessions: any current concessions/specials
+- yearBuilt: year built if found
+- reasoning: 1-2 sentences on why this is a good comp
+
+Return ONLY the JSON array — no markdown fences, no extra text.`,
       messages: [
         {
           role: "user",
-          content: `Subject property: ${propertyName} at ${address}. Unit mix: ${JSON.stringify(unitMix)}. Find 5-7 comparable apartment communities.`,
+          content: `Subject property: ${propertyName} at ${address}.
+Unit mix: ${JSON.stringify(unitMix)}.
+
+Search the web for 5-7 comparable apartment communities near this property. Get real, current rent data for each one.`,
         },
       ],
     });
 
-    const text =
-      message.content[0].type === "text" ? message.content[0].text : "";
-    const cleaned = text.replace(/^```json?\n?/m, "").replace(/\n?```$/m, "");
+    // Extract text from response (may have multiple content blocks with web search)
+    let text = "";
+    for (const block of message.content) {
+      if (block.type === "text") {
+        text += block.text;
+      }
+    }
+
+    const cleaned = text.replace(/^```json?\n?/m, "").replace(/\n?```$/m, "").trim();
 
     res.json({ suggestions: JSON.parse(cleaned) });
   } catch (err: unknown) {
