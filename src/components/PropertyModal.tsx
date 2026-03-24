@@ -6,6 +6,7 @@ interface PropertyModalProps {
   property: Property | null; // null = adding new, non-null = editing
   onSave: (property: Property) => void;
   onCancel: () => void;
+  onDelete?: (propertyId: string) => void;
 }
 
 function slugify(text: string): string {
@@ -22,11 +23,13 @@ export default function PropertyModal({
   property,
   onSave,
   onCancel,
+  onDelete,
 }: PropertyModalProps) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [totalUnits, setTotalUnits] = useState<number | "">("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   useEffect(() => {
     if (isOpen) {
@@ -41,12 +44,14 @@ export default function PropertyModal({
         setCity("");
         setTotalUnits("");
       }
+      setDeleteConfirm("");
     }
   }, [isOpen, property]);
 
   if (!isOpen) return null;
 
   const canSave = name.trim() !== "" && address.trim() !== "" && city.trim() !== "";
+  const canDelete = property && deleteConfirm === property.name;
 
   const handleSave = () => {
     if (!canSave) return;
@@ -62,6 +67,11 @@ export default function PropertyModal({
     };
 
     onSave(saved);
+  };
+
+  const handleDelete = () => {
+    if (!canDelete || !property || !onDelete) return;
+    onDelete(property.id);
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -159,6 +169,34 @@ export default function PropertyModal({
             Save
           </button>
         </div>
+
+        {/* Delete Section — only when editing an existing property */}
+        {property && onDelete && (
+          <div className="mt-6 rounded-lg border border-red-300 bg-red-50 p-4">
+            <h3 className="text-sm font-semibold text-red-700">Delete Property</h3>
+            <p className="mt-1 text-xs text-red-600">
+              This action is permanent and cannot be undone. All survey data associated
+              with this property will be lost. To confirm, type the property name exactly:
+              <span className="font-semibold"> {property.name}</span>
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder={`Type "${property.name}" to confirm`}
+                className="flex-1 rounded border border-red-300 px-3 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              />
+              <button
+                onClick={handleDelete}
+                disabled={!canDelete}
+                className="rounded bg-red-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

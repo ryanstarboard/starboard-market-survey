@@ -103,6 +103,14 @@ export default function Home() {
     setEditingProperty(null);
   };
 
+  const handleDelete = (propertyId: string) => {
+    const updated = properties.filter((p) => p.id !== propertyId);
+    setProperties(updated);
+    saveProperties(updated);
+    setModalOpen(false);
+    setEditingProperty(null);
+  };
+
   const handleCancel = () => {
     setModalOpen(false);
     setEditingProperty(null);
@@ -208,6 +216,7 @@ export default function Home() {
         property={editingProperty}
         onSave={handleSave}
         onCancel={handleCancel}
+        onDelete={handleDelete}
       />
     </div>
   );

@@ -110,14 +110,45 @@ export interface Comp {
   source: string;
 }
 
+// ── Subject Property ─────────────────────────────────────────────────────────
+
+export interface SubjectProperty {
+  yearBuilt: string | null;
+  renovated: boolean | null;
+  renoDate: string | null;
+  furnished: boolean | null;
+  leasedPct: number | null;
+  occupancyPct: number | null;
+  applicationFee: number | null;
+  adminFee: number | null;
+  securityDeposit: number | null;
+  mtmFee: number | null;
+  leaseTerms: string;
+  utilitiesIncluded: string;
+  otherFees: OtherFee[];
+  concessions: string;
+  residentReferrals: boolean | null;
+  referralAmount: number | null;
+  communityAmenities: string[];
+  unitAmenities: string[];
+  petLimit: string;
+  petDeposit: number | null;
+  petRent: number | null;
+  petFee: number | null;
+  petRules: string;
+  otherNotes: string;
+  floorPlans: FloorPlan[];
+}
+
 // ── Survey State ─────────────────────────────────────────────────────────────
 
 export interface SurveyState {
   propertyId: string;
-  stage: 0 | 1 | 2;
+  stage: 0 | 1 | 2 | 3;
   rentRoll: RentRollSummary | null;
   rrTab: "all" | "avgMI" | "recent" | "recentAvgMI";
   comps: Comp[];
+  subjectProperty: SubjectProperty | null;
   preparedBy: string;
   surveyDate: string;
   comments: string;

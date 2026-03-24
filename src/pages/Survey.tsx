@@ -2,20 +2,22 @@ import { useReducer } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
+import SubjectPropertyStage from "../stages/SubjectProperty";
 import CompData from "../stages/CompData";
 import SurveyMeta from "../stages/SurveyMeta";
 import { getProperties } from "./Home";
-import type { Property, SurveyState, RentRollSummary, Comp } from "../lib/types";
+import type { Property, SurveyState, RentRollSummary, SubjectProperty, Comp } from "../lib/types";
 
-const STAGES = ["Rent Roll", "Comp Data", "Survey Completion"] as const;
+const STAGES = ["Rent Roll", "Subject Property", "Comp Data", "Survey Completion"] as const;
 
 type SurveyAction =
-  | { type: "SET_STAGE"; stage: 0 | 1 | 2 }
+  | { type: "SET_STAGE"; stage: 0 | 1 | 2 | 3 }
   | { type: "NEXT_STAGE" }
   | { type: "PREV_STAGE" }
   | { type: "SET_RENT_ROLL"; rentRoll: RentRollSummary | null }
   | { type: "SET_RR_TAB"; tab: SurveyState["rrTab"] }
   | { type: "SET_COMPS"; comps: Comp[] }
+  | { type: "SET_SUBJECT_PROPERTY"; subjectProperty: SubjectProperty }
   | { type: "SET_FIELD"; field: "preparedBy" | "surveyDate" | "comments"; value: string };
 
 function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
@@ -25,7 +27,7 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
     case "NEXT_STAGE":
       return {
         ...state,
-        stage: Math.min(state.stage + 1, 2) as SurveyState["stage"],
+        stage: Math.min(state.stage + 1, 3) as SurveyState["stage"],
       };
     case "PREV_STAGE":
       return {
@@ -38,6 +40,8 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
       return { ...state, rrTab: action.tab };
     case "SET_COMPS":
       return { ...state, comps: action.comps };
+    case "SET_SUBJECT_PROPERTY":
+      return { ...state, subjectProperty: action.subjectProperty };
     case "SET_FIELD":
       return { ...state, [action.field]: action.value };
     default:
@@ -68,6 +72,15 @@ function StageContent({
       );
     case 1:
       return (
+        <SubjectPropertyStage
+          subjectProperty={state.subjectProperty}
+          propertyName={property?.name ?? "Subject Property"}
+          rentRoll={state.rentRoll}
+          onChange={(sp) => dispatch({ type: "SET_SUBJECT_PROPERTY", subjectProperty: sp })}
+        />
+      );
+    case 2:
+      return (
         <CompData
           comps={state.comps}
           onCompsChange={(comps) => dispatch({ type: "SET_COMPS", comps })}
@@ -75,7 +88,7 @@ function StageContent({
           rentRoll={state.rentRoll}
         />
       );
-    case 2:
+    case 3:
       return (
         <SurveyMeta
           comps={state.comps}
@@ -105,6 +118,7 @@ export default function Survey() {
     rentRoll: null,
     rrTab: "all",
     comps: [],
+    subjectProperty: null,
     preparedBy: "",
     surveyDate: new Date().toISOString().slice(0, 10),
     comments: "",
@@ -149,7 +163,7 @@ export default function Survey() {
                   onClick={() =>
                     dispatch({
                       type: "SET_STAGE",
-                      stage: i as 0 | 1 | 2,
+                      stage: i as 0 | 1 | 2 | 3,
                     })
                   }
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
@@ -222,10 +236,10 @@ export default function Survey() {
             </button>
             <button
               onClick={() => dispatch({ type: "NEXT_STAGE" })}
-              disabled={state.stage === 2}
+              disabled={state.stage === 3}
               className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {state.stage === 1 ? "Review & Export" : "Next"}
+              {state.stage === 2 ? "Review & Export" : "Next"}
             </button>
           </div>
         </div>
