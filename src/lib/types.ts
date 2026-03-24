@@ -40,6 +40,8 @@ export interface RentRollSummary {
     high: number;
     avgMoveInDate: string;
     avgTenureMonths: number;
+    avgSqft: number | null;
+    leasedPct: number;
   }[];
   recentCutoff: number;
   recent: RentRollRow[];

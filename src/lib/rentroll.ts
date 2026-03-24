@@ -169,13 +169,13 @@ export function summarizeRentRoll(
   // Group rows by bdBa type
   const groups = new Map<
     string,
-    { rents: number[]; moveIns: Date[]; rows: RentRollRow[] }
+    { rents: number[]; moveIns: Date[]; rows: RentRollRow[]; sqfts: number[] }
   >();
 
   for (const row of rows) {
     const type = row.bdBa || 'Unknown';
     if (!groups.has(type)) {
-      groups.set(type, { rents: [], moveIns: [], rows: [] });
+      groups.set(type, { rents: [], moveIns: [], rows: [], sqfts: [] });
     }
     const g = groups.get(type)!;
     g.rows.push(row);
@@ -183,6 +183,10 @@ export function summarizeRentRoll(
     // Only include rows with actual rent for stats
     if (row.rent != null) {
       g.rents.push(row.rent);
+    }
+
+    if (row.sqft != null) {
+      g.sqfts.push(row.sqft);
     }
 
     if (row.moveIn) {
@@ -216,6 +220,22 @@ export function summarizeRentRoll(
       );
     }
 
+    // Average sqft across all units of this type
+    const avgSqft =
+      g.sqfts.length > 0
+        ? Math.round(g.sqfts.reduce((a, b) => a + b, 0) / g.sqfts.length)
+        : null;
+
+    // Leased %: units with status "Current" or rent > 0, divided by total units of this type
+    const totalUnits = g.rows.length;
+    const leasedUnits = g.rows.filter(
+      (r) =>
+        (r.status && r.status.toLowerCase() === 'current') ||
+        (r.rent != null && r.rent > 0),
+    ).length;
+    const leasedPct =
+      totalUnits > 0 ? Math.round((leasedUnits / totalUnits) * 100) : 0;
+
     return {
       type,
       count,
@@ -224,6 +244,8 @@ export function summarizeRentRoll(
       high,
       avgMoveInDate,
       avgTenureMonths,
+      avgSqft,
+      leasedPct,
     };
   });
 

@@ -48,6 +48,8 @@ After searching, return your results as a JSON array. Each object must have:
 - petRent: monthly pet rent if found
 - concessions: any current concessions/specials
 - yearBuilt: year built if found
+- communityAmenities: array of community amenity strings from this list ONLY: "Pool", "Fitness Center", "Clubhouse", "Business Center", "Dog Park", "Playground", "BBQ/Grill Area", "Package Lockers", "EV Charging", "Gated Access", "Garage Parking", "Covered Parking", "Storage Units", "On-Site Laundry", "Bike Storage"
+- unitAmenities: array of in-unit amenity strings from this list ONLY: "Washer/Dryer", "W/D Hookups", "Dishwasher", "Microwave", "Stainless Appliances", "Granite/Quartz Counters", "Hardwood/Vinyl Plank", "Carpet", "Patio/Balcony", "Walk-In Closet", "Fireplace", "Central AC", "Smart Thermostat", "USB Outlets"
 - reasoning: 1-2 sentences on why this is a good comp
 
 Return ONLY the JSON array — no markdown fences, no extra text.`,

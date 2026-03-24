@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
@@ -140,6 +140,9 @@ function StageContent({
           onFieldChange={(field, value) =>
             dispatch({ type: "SET_FIELD", field, value })
           }
+          property={property}
+          subjectProperty={state.subjectProperty}
+          rentRoll={state.rentRoll}
         />
       );
     default:
@@ -154,11 +157,20 @@ export default function Survey() {
   const property = getProperties().find((p) => p.id === propertyId) ?? null;
   const pid = propertyId || "";
 
+  // Track whether we resumed from saved data
+  const didResume = useRef(false);
+  const [showResumed, setShowResumed] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+
   const [state, dispatch] = useReducer(
     surveyReducer,
     pid,
-    (id): SurveyState =>
-      loadSurvey(id) ?? {
+    (id): SurveyState => {
+      const saved = loadSurvey(id);
+      if (saved) {
+        didResume.current = true;
+      }
+      return saved ?? {
         propertyId: id,
         stage: 0,
         rentRoll: null,
@@ -168,12 +180,30 @@ export default function Survey() {
         preparedBy: "",
         surveyDate: new Date().toISOString().slice(0, 10),
         comments: "",
-      }
+      };
+    }
   );
+
+  // Show "Resumed from saved progress" toast on mount if we loaded saved data
+  useEffect(() => {
+    if (didResume.current) {
+      setShowResumed(true);
+      const timer = setTimeout(() => setShowResumed(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Auto-save on every state change
   useEffect(() => {
     if (pid) saveSurvey(pid, state);
+  }, [pid, state]);
+
+  const handleSaveProgress = useCallback(() => {
+    if (pid) {
+      saveSurvey(pid, state);
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    }
   }, [pid, state]);
 
   const handleClearSurvey = useCallback(() => {
@@ -184,7 +214,7 @@ export default function Survey() {
   }, [pid]);
 
   return (
-    <div className="h-[calc(100vh-65px)] flex flex-col">
+    <div className="h-[calc(100vh-65px)] flex flex-col relative">
       {/* Progress bar */}
       <div className="bg-white border-b border-slate-200 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -291,7 +321,7 @@ export default function Survey() {
           </div>
 
           {/* Navigation buttons */}
-          <div className="px-6 py-4 border-t border-slate-200 bg-white flex justify-between">
+          <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between">
             <button
               onClick={() => dispatch({ type: "PREV_STAGE" })}
               disabled={state.stage === 0}
@@ -299,6 +329,22 @@ export default function Survey() {
             >
               Back
             </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSaveProgress}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                Save Progress
+              </button>
+              {showSaved && (
+                <span className="text-sm font-medium text-emerald-600 animate-pulse">
+                  Saved!
+                </span>
+              )}
+            </div>
             <button
               onClick={() => dispatch({ type: "NEXT_STAGE" })}
               disabled={state.stage === 3}
@@ -307,6 +353,15 @@ export default function Survey() {
               {state.stage === 2 ? "Review & Export" : "Next"}
             </button>
           </div>
+
+          {/* Resume toast */}
+          {showResumed && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50">
+              <div className="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg animate-pulse">
+                Resumed from saved progress
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

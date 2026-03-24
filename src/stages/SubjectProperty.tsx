@@ -24,11 +24,14 @@ function createDefault(rentRoll: RentRollSummary | null): SubjectPropertyType {
   const floorPlans: FloorPlan[] = rentRoll
     ? rentRoll.byType.map((bt) => ({
         type: bt.type,
-        sqft: null,
+        sqft: bt.avgSqft ?? null,
         unitCount: bt.count,
-        leasedPct: null,
+        leasedPct: bt.leasedPct ?? null,
         rent: Math.round(bt.avgRent),
-        psf: null,
+        psf:
+          bt.avgSqft && bt.avgRent
+            ? Math.round((bt.avgRent / bt.avgSqft) * 100) / 100
+            : null,
       }))
     : [];
 

@@ -20,6 +20,8 @@ export interface CompSuggestion {
   petRent?: number;
   concessions?: string;
   yearBuilt?: string;
+  communityAmenities?: string[];
+  unitAmenities?: string[];
 }
 
 // ── Comp Suggestions ────────────────────────────────────────────────────────

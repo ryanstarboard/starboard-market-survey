@@ -361,6 +361,29 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
             <span className="text-sm font-medium text-slate-700">
               Avg Rent: {avgRent(comp)}
             </span>
+            {/* Called / Toured pill toggles */}
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => update("called", !comp.called)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                  comp.called
+                    ? "bg-emerald-500 text-white border-emerald-500"
+                    : "bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                Called
+              </button>
+              <button
+                onClick={() => update("toured", !comp.toured)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                  comp.toured
+                    ? "bg-emerald-500 text-white border-emerald-500"
+                    : "bg-slate-100 text-slate-500 border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                Toured
+              </button>
+            </div>
             {sourceBadge(comp.source)}
             <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

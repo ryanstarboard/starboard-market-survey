@@ -88,6 +88,8 @@ function suggestionToComp(s: CompSuggestion): Comp {
     yearBuilt: (s as any).yearBuilt ?? null,
     concessions: s.concessions || "",
     otherNotes: s.reasoning || "",
+    communityAmenities: s.communityAmenities || [],
+    unitAmenities: s.unitAmenities || [],
     floorPlans,
     source: "AI Suggestion",
   };

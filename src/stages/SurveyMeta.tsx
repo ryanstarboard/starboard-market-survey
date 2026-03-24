@@ -1,4 +1,5 @@
-import type { Comp } from "../lib/types";
+import type { Comp, Property, SubjectProperty, RentRollSummary } from "../lib/types";
+import { exportToExcel } from "../lib/export";
 
 interface SurveyMetaProps {
   comps: Comp[];
@@ -10,117 +11,28 @@ interface SurveyMetaProps {
     field: "preparedBy" | "surveyDate" | "comments",
     value: string,
   ) => void;
-}
-
-/* ── pill-shaped toggle ──────────────────────────────────────────────── */
-
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-        checked ? "bg-blue-600" : "bg-slate-300"
-      }`}
-    >
-      <span
-        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
-  );
+  property: Property | null;
+  subjectProperty: SubjectProperty | null;
+  rentRoll: RentRollSummary | null;
 }
 
 /* ── main component ──────────────────────────────────────────────────── */
 
 export default function SurveyMeta({
   comps,
-  onCompsChange,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onCompsChange: _onCompsChange,
   preparedBy,
   surveyDate,
   comments,
   onFieldChange,
+  property,
+  subjectProperty,
+  rentRoll,
 }: SurveyMetaProps) {
-  const activeComps = comps.filter((c) => !c.excluded);
-
-  function toggleField(compId: string, field: "called" | "toured") {
-    onCompsChange(
-      comps.map((c) =>
-        c.id === compId ? { ...c, [field]: !c[field] } : c,
-      ),
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* ── Called / Toured ──────────────────────────────────────────── */}
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold text-slate-800">
-          Called / Toured
-        </h2>
-
-        {activeComps.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No active comps. Add comps in Stage 2 first.
-          </p>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {activeComps.map((comp) => (
-              <div
-                key={comp.id}
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0"
-              >
-                {/* name + address */}
-                <div className="min-w-[200px] flex-1">
-                  <p className="text-sm font-medium text-slate-800">
-                    {comp.name || "Unnamed comp"}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {comp.address || "No address"}
-                  </p>
-                </div>
-
-                {/* called toggle */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-600">
-                    Called
-                  </span>
-                  <Toggle
-                    checked={comp.called}
-                    onChange={() => toggleField(comp.id, "called")}
-                    label={`Mark ${comp.name} as called`}
-                  />
-                </div>
-
-                {/* toured toggle */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-600">
-                    Toured
-                  </span>
-                  <Toggle
-                    checked={comp.toured}
-                    onChange={() => toggleField(comp.id, "toured")}
-                    label={`Mark ${comp.name} as toured`}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       {/* ── Survey Info ─────────────────────────────────────────────── */}
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-slate-800">
@@ -207,9 +119,24 @@ export default function SurveyMeta({
 
           {/* Excel */}
           <button
-            disabled
-            title="Coming soon"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 shadow-sm cursor-not-allowed"
+            disabled={!property}
+            onClick={() => {
+              if (!property) return;
+              exportToExcel(
+                property,
+                subjectProperty,
+                comps,
+                rentRoll,
+                preparedBy,
+                surveyDate,
+                comments,
+              );
+            }}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${
+              property
+                ? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+            }`}
           >
             <svg
               className="h-4 w-4"
@@ -252,7 +179,7 @@ export default function SurveyMeta({
         </div>
 
         <p className="mt-3 text-xs text-slate-400">
-          Export functionality is coming soon.
+          Google Sheets and PDF export coming soon.
         </p>
       </section>
     </div>
