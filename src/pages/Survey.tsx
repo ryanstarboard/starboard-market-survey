@@ -4,6 +4,7 @@ import ChatPanel from "../components/ChatPanel";
 import RentRoll from "../stages/RentRoll";
 import CompData from "../stages/CompData";
 import SurveyMeta from "../stages/SurveyMeta";
+import { SAMPLE_PROPERTIES } from "./Home";
 import type { SurveyState, RentRollSummary, Comp } from "../lib/types";
 
 const STAGES = ["Rent Roll", "Comp Data", "Survey Completion"] as const;
@@ -47,9 +48,11 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
 function StageContent({
   state,
   dispatch,
+  property,
 }: {
   state: SurveyState;
   dispatch: React.Dispatch<SurveyAction>;
+  property: ReturnType<typeof SAMPLE_PROPERTIES.find> | null;
 }) {
   switch (state.stage) {
     case 0:
@@ -68,6 +71,8 @@ function StageContent({
         <CompData
           comps={state.comps}
           onCompsChange={(comps) => dispatch({ type: "SET_COMPS", comps })}
+          property={property ?? null}
+          rentRoll={state.rentRoll}
         />
       );
     case 2:
@@ -91,6 +96,8 @@ function StageContent({
 export default function Survey() {
   const { propertyId } = useParams<{ propertyId: string }>();
   const navigate = useNavigate();
+
+  const property = SAMPLE_PROPERTIES.find((p) => p.id === propertyId) ?? null;
 
   const [state, dispatch] = useReducer(surveyReducer, {
     propertyId: propertyId || "",
@@ -191,12 +198,17 @@ export default function Survey() {
       {/* Main content area: chat panel + stage content */}
       <div className="flex-1 flex overflow-hidden">
         <div className="w-[350px] flex-shrink-0">
-          <ChatPanel stage={state.stage} />
+          <ChatPanel
+            stage={state.stage}
+            property={property}
+            rentRoll={state.rentRoll}
+            comps={state.comps}
+          />
         </div>
 
         <div className="flex-1 flex flex-col overflow-y-auto">
           <div className="flex-1 flex flex-col p-6">
-            <StageContent state={state} dispatch={dispatch} />
+            <StageContent state={state} dispatch={dispatch} property={property} />
           </div>
 
           {/* Navigation buttons */}

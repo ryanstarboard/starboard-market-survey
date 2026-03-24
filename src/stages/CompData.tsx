@@ -1,11 +1,15 @@
 import { useState } from "react";
-import type { Comp } from "../lib/types";
+import type { Comp, RentRollSummary, Property } from "../lib/types";
 import { CompCard } from "../components/CompCard";
 import ExcludeModal from "../components/ExcludeModal";
+import { fetchCompSuggestions } from "../lib/api";
+import type { CompSuggestion } from "../lib/api";
 
 interface CompDataProps {
   comps: Comp[];
   onCompsChange: (comps: Comp[]) => void;
+  property: Property | null;
+  rentRoll: RentRollSummary | null;
 }
 
 function generateId(): string {
@@ -48,9 +52,28 @@ function blankComp(): Comp {
   };
 }
 
-export default function CompData({ comps, onCompsChange }: CompDataProps) {
+function suggestionToComp(s: CompSuggestion): Comp {
+  return {
+    ...blankComp(),
+    id: generateId(),
+    name: s.name,
+    address: s.address,
+    cityState: s.cityState,
+    distanceFromSubject: s.distanceFromSubject,
+    phone: s.phone || "",
+    totalUnits: s.totalUnits || 0,
+    leaseTerms: s.leaseTerms || "",
+    utilitiesIncluded: s.utilitiesIncluded || "",
+    otherNotes: s.reasoning || "",
+    source: "AI Suggestion",
+  };
+}
+
+export default function CompData({ comps, onCompsChange, property, rentRoll }: CompDataProps) {
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [excludingCompId, setExcludingCompId] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const activeComps = comps.filter((c) => !c.excluded);
   const excludedComps = comps.filter((c) => c.excluded);
@@ -87,7 +110,37 @@ export default function CompData({ comps, onCompsChange }: CompDataProps) {
     onCompsChange([...comps, blankComp()]);
   };
 
+  const findCompsWithAI = async () => {
+    if (!property) return;
+    setAiLoading(true);
+    setAiError(null);
+
+    const unitMix = rentRoll
+      ? rentRoll.byType.map((t) => ({
+          type: t.type,
+          count: t.count,
+          avgRent: t.avgRent,
+        }))
+      : [];
+
+    try {
+      const suggestions = await fetchCompSuggestions(
+        property.name,
+        property.address,
+        unitMix
+      );
+      const newComps = suggestions.map(suggestionToComp);
+      onCompsChange([...comps, ...newComps]);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "Failed to find comps");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const excludingComp = comps.find((c) => c.id === excludingCompId);
+
+  const canSearchAI = !!property && !aiLoading;
 
   return (
     <div className="space-y-4">
@@ -111,18 +164,84 @@ export default function CompData({ comps, onCompsChange }: CompDataProps) {
             </span>
           )}
         </div>
-        <button
-          onClick={addComp}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          + Add Comp
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={findCompsWithAI}
+            disabled={!canSearchAI}
+            className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm inline-flex items-center gap-2"
+          >
+            {aiLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Searching...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Find Comps with AI
+              </>
+            )}
+          </button>
+          <button
+            onClick={addComp}
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            + Add Manually
+          </button>
+        </div>
       </div>
 
-      {/* Active Comps */}
-      {activeComps.length === 0 && excludedComps.length === 0 && (
-        <div className="text-center py-12 text-slate-400 bg-white rounded-lg border border-dashed border-slate-300">
-          <p className="text-sm">No comps yet. Add manually or use AI suggestions in a future update.</p>
+      {/* AI Error */}
+      {aiError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
+          <span>{aiError}</span>
+          <button onClick={() => setAiError(null)} className="text-red-400 hover:text-red-600 ml-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {activeComps.length === 0 && excludedComps.length === 0 && !aiLoading && (
+        <div className="text-center py-12 bg-white rounded-lg border border-dashed border-slate-300">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h3 className="text-base font-semibold text-slate-700 mb-1">No comps yet</h3>
+          <p className="text-sm text-slate-500 mb-4 max-w-sm mx-auto">
+            Click "Find Comps with AI" to automatically search for comparable properties near {property?.name || "your property"}.
+          </p>
+          <button
+            onClick={findCompsWithAI}
+            disabled={!canSearchAI}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-40 transition-colors shadow-sm inline-flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Find Comps with AI
+          </button>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {aiLoading && activeComps.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+          <svg className="w-10 h-10 mx-auto mb-3 text-emerald-500 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-sm font-medium text-slate-600">Searching for comparable properties...</p>
+          <p className="text-xs text-slate-400 mt-1">This may take 15-30 seconds</p>
         </div>
       )}
 

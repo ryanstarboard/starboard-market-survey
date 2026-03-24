@@ -1,16 +1,61 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { streamChat } from "../lib/api";
+import type { Property, RentRollSummary, Comp } from "../lib/types";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-const STAGE_PROMPTS: Record<number, string> = {
-  0: "You are helping a property manager with their rent roll data. They are uploading an AppFolio rent roll export. Help them understand the data: unit counts, average rents, occupancy, and trends. Be concise and practical.",
-  1: "You are helping a property manager evaluate comparable properties for a market survey. Help them assess whether comps are appropriate, compare rents and amenities, and identify outliers. Be concise and practical.",
-  2: "You are helping a property manager finalize their market survey. Help them review the data, note any gaps, and prepare for export. Be concise and practical.",
-};
+function buildSystemPrompt(
+  stage: number,
+  property: Property | null,
+  rentRoll: RentRollSummary | null,
+  comps: Comp[]
+): string {
+  let context = "You are a helpful real estate market survey assistant for Starboard Real Estate. Be concise and practical.\n\n";
+
+  if (property) {
+    context += `SUBJECT PROPERTY:\n- Name: ${property.name}\n- Address: ${property.address}\n- City: ${property.city}\n- Total Units: ${property.totalUnits}\n\n`;
+  }
+
+  if (rentRoll) {
+    context += "RENT ROLL SUMMARY (already uploaded and parsed):\n";
+    for (const t of rentRoll.byType) {
+      context += `- ${t.type}: ${t.count} units, avg rent $${t.avgRent}, range $${t.low}-$${t.high}, avg tenure ${t.avgTenureMonths} months\n`;
+    }
+    context += `- ${rentRoll.recent.length} most recent leases loaded\n\n`;
+  }
+
+  if (comps.length > 0) {
+    const active = comps.filter((c) => !c.excluded);
+    const excluded = comps.filter((c) => c.excluded);
+    context += `COMPS (${active.length} active, ${excluded.length} excluded):\n`;
+    for (const c of active) {
+      const avgRent = c.floorPlans.length > 0
+        ? Math.round(c.floorPlans.reduce((s, fp) => s + (fp.rent ?? 0), 0) / c.floorPlans.length)
+        : null;
+      context += `- ${c.name || "Unnamed"}: ${c.address || "no address"}, ${c.totalUnits} units${avgRent ? `, ~$${avgRent} avg rent` : ""}\n`;
+    }
+    context += "\n";
+  }
+
+  switch (stage) {
+    case 0:
+      context += rentRoll
+        ? "The rent roll has been uploaded and parsed. Help the user understand their data — unit mix, rent ranges, trends, and anything notable."
+        : "The user needs to upload their AppFolio rent roll. Help them with the process if they have questions.";
+      break;
+    case 1:
+      context += "Help the user evaluate comparable properties. You already know the subject property details and rent roll data above — never ask for this information. Help assess comps, compare rents, identify outliers.";
+      break;
+    case 2:
+      context += "Help the user finalize the survey. Review data completeness, note gaps, and help prepare for export.";
+      break;
+  }
+
+  return context;
+}
 
 const STAGE_WELCOME: Record<number, string> = {
   0: "Welcome! Upload your rent roll to get started. I can help you understand the data once it's loaded.",
@@ -20,9 +65,12 @@ const STAGE_WELCOME: Record<number, string> = {
 
 interface ChatPanelProps {
   stage: number;
+  property?: Property | null;
+  rentRoll?: RentRollSummary | null;
+  comps?: Comp[];
 }
 
-export default function ChatPanel({ stage }: ChatPanelProps) {
+export default function ChatPanel({ stage, property = null, rentRoll = null, comps = [] }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: STAGE_WELCOME[stage] ?? STAGE_WELCOME[0] },
   ]);
@@ -64,9 +112,11 @@ export default function ChatPanel({ stage }: ChatPanelProps) {
       content: m.content,
     }));
 
+    const systemPrompt = buildSystemPrompt(stage, property, rentRoll, comps);
+
     const abort = streamChat(
       allMessages,
-      STAGE_PROMPTS[stage] ?? STAGE_PROMPTS[0],
+      systemPrompt,
       (chunk) => {
         setMessages((prev) => {
           const updated = [...prev];
@@ -98,7 +148,7 @@ export default function ChatPanel({ stage }: ChatPanelProps) {
     );
 
     abortRef.current = abort;
-  }, [input, streaming, messages, stage]);
+  }, [input, streaming, messages, stage, property, rentRoll, comps]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import type { Property } from "../lib/types";
 
-const SAMPLE_PROPERTIES: Property[] = [
+export const SAMPLE_PROPERTIES: Property[] = [
   {
     id: "the-james",
     name: "The James",
