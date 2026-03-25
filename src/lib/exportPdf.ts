@@ -58,6 +58,12 @@ function diffColor(v: number | null | undefined): string {
   return v >= 0 ? POS : NEG;
 }
 
+/** Truncate text to maxLen chars, appending "..." if truncated */
+function truncate(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + "...";
+}
+
 /** Get non-excluded comps */
 function activeComps(comps: Comp[]): Comp[] {
   return comps.filter((c) => !c.excluded);
@@ -211,17 +217,25 @@ function collectAmenities(
 /* ── styles ───────────────────────────────────────────────────────────────── */
 
 const s = StyleSheet.create({
+  /* Cover page uses default 40pt padding */
   page: {
     padding: 40,
     fontFamily: "Helvetica",
     fontSize: 8,
     color: NAVY,
   },
+  /* Detail / summary pages use tighter 30pt padding */
+  pageCompact: {
+    padding: 30,
+    fontFamily: "Helvetica",
+    fontSize: 7,
+    color: NAVY,
+  },
   // Header
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   brandName: {
     fontSize: 14,
@@ -241,32 +255,40 @@ const s = StyleSheet.create({
     alignItems: "flex-end",
   },
   headerRightText: {
-    fontSize: 8,
+    fontSize: 7,
     color: GRAY,
   },
   divider: {
     height: 1.5,
     backgroundColor: BLUE,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   // Section
   sectionTitle: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: NAVY,
-    marginBottom: 6,
-    marginTop: 10,
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  // Compact section title for detail pages
+  sectionTitleCompact: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: NAVY,
+    marginBottom: 3,
+    marginTop: 4,
   },
   // Section header with navy background
   sectionHeaderBar: {
     backgroundColor: NAVY,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginTop: 10,
-    marginBottom: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    marginTop: 4,
+    marginBottom: 3,
   },
   sectionHeaderBarText: {
-    fontSize: 9,
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
     color: WHITE,
   },
@@ -274,7 +296,7 @@ const s = StyleSheet.create({
   kpiRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   kpiBox: {
     flex: 1,
@@ -298,33 +320,33 @@ const s = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     backgroundColor: NAVY,
-    paddingVertical: 4,
+    paddingVertical: 3,
     paddingHorizontal: 4,
   },
   tableHeaderText: {
     color: WHITE,
     fontFamily: "Helvetica-Bold",
-    fontSize: 7,
+    fontSize: 6.5,
   },
   tableRow: {
     flexDirection: "row",
-    paddingVertical: 3,
+    paddingVertical: 2,
     paddingHorizontal: 4,
     borderBottom: `0.5 solid ${BORDER}`,
   },
   tableCell: {
-    fontSize: 7,
+    fontSize: 6.5,
   },
   // Footer
   footer: {
     position: "absolute",
-    bottom: 20,
-    left: 40,
-    right: 40,
+    bottom: 16,
+    left: 30,
+    right: 30,
     flexDirection: "row",
     justifyContent: "space-between",
     borderTop: `0.5 solid ${BORDER}`,
-    paddingTop: 4,
+    paddingTop: 3,
   },
   footerText: {
     fontSize: 6,
@@ -333,64 +355,88 @@ const s = StyleSheet.create({
   // Amenity
   amenityRow: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 4,
   },
   amenityCol: {
     flex: 1,
   },
   amenityColTitle: {
-    fontSize: 8,
+    fontSize: 7,
     fontFamily: "Helvetica-Bold",
     color: NAVY,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  // Detail page styles
+  // Detail page styles — compact 3-column grid
   detailRow: {
     flexDirection: "row",
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+    paddingVertical: 1.5,
+    paddingHorizontal: 3,
   },
   detailLabel: {
-    fontSize: 7,
+    fontSize: 6.5,
     fontFamily: "Helvetica-Bold",
     color: GRAY,
-    width: 100,
+    width: 70,
   },
   detailValue: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: NAVY,
+    flex: 1,
+  },
+  detailThreeCol: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  detailColThird: {
     flex: 1,
   },
   detailTwoCol: {
     flexDirection: "row",
-    gap: 16,
+    gap: 8,
   },
   detailColHalf: {
     flex: 1,
   },
   notesText: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: NAVY,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: 3,
+    paddingVertical: 3,
     backgroundColor: ROW_ALT,
     borderRadius: 2,
   },
   // Map placeholder
   mapPlaceholder: {
-    height: 200,
+    height: 250,
     backgroundColor: ROW_ALT,
     borderRadius: 4,
     border: `1 solid ${BORDER}`,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   mapPlaceholderText: {
     fontSize: 8,
     color: GRAY,
     textAlign: "center",
+  },
+  // Cover page styles
+  coverPropertyName: {
+    fontSize: 22,
+    fontFamily: "Helvetica-Bold",
+    color: NAVY,
+    marginBottom: 3,
+  },
+  coverAddress: {
+    fontSize: 10,
+    color: GRAY,
+    marginBottom: 12,
+  },
+  coverMeta: {
+    fontSize: 8,
+    color: GRAY,
+    marginTop: 2,
   },
 });
 
@@ -508,13 +554,9 @@ function DetailField(label: string, value: string, bgAlt?: boolean) {
 /* ── Map placeholder / image component ────────────────────────────────────── */
 
 /**
- * Renders the map section on Page 1.
+ * Renders the map section on the Cover Page.
  * If mapDataUri is available, renders the actual map image.
  * If not, renders a placeholder with the listed addresses.
- *
- * TODO: Replace placeholder with actual map image once GOOGLE_MAPS_API_KEY is configured.
- * The map image will be fetched from the /api/map/static endpoint and passed as a
- * base64 data URI to the Image component.
  */
 function MapSection(
   property: Property,
@@ -522,13 +564,13 @@ function MapSection(
   mapDataUri: string | null,
 ) {
   if (mapDataUri) {
-    // Render actual map image
+    // Render actual map image — larger 250pt for cover page
     return el(
       View,
-      { style: { marginBottom: 12 } },
+      { style: { marginBottom: 10 } },
       el(Image, {
         src: mapDataUri,
-        style: { width: "100%", height: 200 },
+        style: { width: "100%", height: 250 },
       }),
     );
   }
@@ -598,9 +640,9 @@ function Footer(preparedBy: string, surveyDate: string, pageNum: number) {
   );
 }
 
-/* ── Page 1: Executive Summary ─────────────────────────────────────────────── */
+/* ── Page 1: Cover Page (light & visual) ──────────────────────────────────── */
 
-function Page1(
+function CoverPage(
   property: Property,
   subjectProperty: SubjectProperty | null,
   comps: Comp[],
@@ -618,6 +660,79 @@ function Page1(
       ? (varianceDollar / mktAvg) * 100
       : null;
 
+  return el(
+    Page,
+    { size: "LETTER", orientation: "landscape", style: s.page },
+
+    // Map section (image or placeholder) — large, visual
+    MapSection(property, comps, mapDataUri),
+
+    // Property name — large & bold
+    el(Text, { style: s.coverPropertyName }, property.name),
+    el(Text, { style: s.coverAddress }, property.address + ", " + property.city),
+
+    // 4 KPI boxes
+    el(
+      View,
+      { style: s.kpiRow },
+      el(
+        View,
+        { style: s.kpiBox },
+        el(Text, { style: s.kpiLabel }, "Subject Avg Rent"),
+        el(Text, { style: { ...s.kpiValue, color: NAVY } }, fmtCurrency(subjAvg)),
+      ),
+      el(
+        View,
+        { style: s.kpiBox },
+        el(Text, { style: s.kpiLabel }, "Market Avg Rent"),
+        el(Text, { style: { ...s.kpiValue, color: NAVY } }, fmtCurrency(mktAvg)),
+      ),
+      el(
+        View,
+        { style: s.kpiBox },
+        el(Text, { style: s.kpiLabel }, "Variance $"),
+        el(Text, { style: { ...s.kpiValue, color: diffColor(varianceDollar) } }, fmtDiff(varianceDollar)),
+      ),
+      el(
+        View,
+        { style: s.kpiBox },
+        el(Text, { style: s.kpiLabel }, "Variance %"),
+        el(Text, { style: { ...s.kpiValue, color: diffColor(variancePct) } }, fmtDiffPct(variancePct)),
+      ),
+    ),
+
+    // Metadata row
+    el(
+      View,
+      { style: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 } },
+      el(
+        View,
+        null,
+        el(Text, { style: s.coverMeta }, "Prepared by: " + preparedBy),
+        el(Text, { style: s.coverMeta }, "Date: " + surveyDate),
+      ),
+      el(
+        View,
+        { style: { alignItems: "flex-end" } },
+        el(Text, { style: s.coverMeta }, "Comps Analyzed: " + active.length),
+      ),
+    ),
+
+    Footer(preparedBy, surveyDate, 1),
+  );
+}
+
+/* ── Page 2: Executive Summary (tables) ───────────────────────────────────── */
+
+function ExecutiveSummaryPage(
+  property: Property,
+  subjectProperty: SubjectProperty | null,
+  comps: Comp[],
+  rentRoll: RentRollSummary | null,
+  preparedBy: string,
+  surveyDate: string,
+) {
+  const active = activeComps(comps);
   const unitTypes = collectFloorPlanTypes(subjectProperty, active, rentRoll);
   const feeNames = [
     "Application Fee",
@@ -628,69 +743,23 @@ function Page1(
     "Pet Rent",
   ];
 
+  // Community & unit amenities as comma-separated summaries
+  const communityAmenities = collectAmenities(subjectProperty, active, "communityAmenities");
+  const unitAmenities = collectAmenities(subjectProperty, active, "unitAmenities");
+
+  // Concessions
+  const concessionsData = active
+    .filter((c) => c.concessions && c.concessions.trim().length > 0)
+    .map((c) => ({ name: c.name, concessions: truncate(c.concessions, 80) }));
+
   return el(
     Page,
-    { size: "LETTER", orientation: "landscape", style: s.page },
+    { size: "LETTER", orientation: "landscape", style: s.pageCompact },
 
-    // Header
     Header(property, preparedBy, surveyDate),
 
-    // Map section (image or placeholder)
-    MapSection(property, comps, mapDataUri),
-
-    // KPI boxes
-    el(Text, { style: s.sectionTitle }, "Market Position"),
-    el(
-      View,
-      { style: s.kpiRow },
-      // Subject Avg Rent
-      el(
-        View,
-        { style: s.kpiBox },
-        el(Text, { style: s.kpiLabel }, "Subject Avg Rent"),
-        el(
-          Text,
-          { style: { ...s.kpiValue, color: NAVY } },
-          fmtCurrency(subjAvg),
-        ),
-      ),
-      // Market Avg Rent
-      el(
-        View,
-        { style: s.kpiBox },
-        el(Text, { style: s.kpiLabel }, "Market Avg Rent"),
-        el(
-          Text,
-          { style: { ...s.kpiValue, color: NAVY } },
-          fmtCurrency(mktAvg),
-        ),
-      ),
-      // Variance $
-      el(
-        View,
-        { style: s.kpiBox },
-        el(Text, { style: s.kpiLabel }, "Variance $"),
-        el(
-          Text,
-          { style: { ...s.kpiValue, color: diffColor(varianceDollar) } },
-          fmtDiff(varianceDollar),
-        ),
-      ),
-      // Variance %
-      el(
-        View,
-        { style: s.kpiBox },
-        el(Text, { style: s.kpiLabel }, "Variance %"),
-        el(
-          Text,
-          { style: { ...s.kpiValue, color: diffColor(variancePct) } },
-          fmtDiffPct(variancePct),
-        ),
-      ),
-    ),
-
     // Rent Comparison Table
-    el(Text, { style: s.sectionTitle }, "Rent Comparison by Unit Type"),
+    el(Text, { style: s.sectionTitleCompact }, "Rent Comparison by Unit Type"),
     tableHeaderRow(RENT_COLS),
     ...unitTypes.map((ut, idx) => {
       const subj = subjectRentForType(ut, subjectProperty, rentRoll);
@@ -721,7 +790,7 @@ function Page1(
     }),
 
     // Fee Comparison Table
-    el(Text, { style: { ...s.sectionTitle, marginTop: 14 } }, "Fee Comparison"),
+    el(Text, { style: { ...s.sectionTitleCompact, marginTop: 8 } }, "Fee Comparison"),
     tableHeaderRow(FEE_COLS),
     ...feeNames.map((fee, idx) => {
       const sv = subjectFee(fee, subjectProperty);
@@ -739,40 +808,40 @@ function Page1(
       );
     }),
 
-    // Footer
-    Footer(preparedBy, surveyDate, 1),
-  );
-}
+    // Amenity summary — compact comma-separated
+    el(Text, { style: { ...s.sectionTitleCompact, marginTop: 8 } }, "Amenity Comparison"),
+    el(
+      View,
+      { style: s.amenityRow },
+      el(
+        View,
+        { style: s.amenityCol },
+        el(Text, { style: s.amenityColTitle }, "Community Amenities"),
+        el(Text, { style: { fontSize: 6.5, color: NAVY } }, communityAmenities.join(", ") || "—"),
+      ),
+      el(
+        View,
+        { style: s.amenityCol },
+        el(Text, { style: s.amenityColTitle }, "In-Unit Amenities"),
+        el(Text, { style: { fontSize: 6.5, color: NAVY } }, unitAmenities.join(", ") || "—"),
+      ),
+    ),
 
-/* ── Page 2: Comp Overview ─────────────────────────────────────────────────── */
-
-function Page2(
-  property: Property,
-  subjectProperty: SubjectProperty | null,
-  comps: Comp[],
-  preparedBy: string,
-  surveyDate: string,
-) {
-  const active = activeComps(comps);
-
-  // Community amenities
-  const communityAmenities = collectAmenities(subjectProperty, active, "communityAmenities");
-  const unitAmenities = collectAmenities(subjectProperty, active, "unitAmenities");
-
-  // Concessions
-  const concessionsData = active
-    .filter((c) => c.concessions && c.concessions.trim().length > 0)
-    .map((c) => ({ name: c.name, concessions: c.concessions }));
-
-  return el(
-    Page,
-    { size: "LETTER", orientation: "landscape", style: s.page },
-
-    // Header
-    Header(property, preparedBy, surveyDate),
+    // Concessions
+    concessionsData.length > 0
+      ? el(
+          View,
+          null,
+          el(Text, { style: { ...s.sectionTitleCompact, marginTop: 6 } }, "Concessions"),
+          tableHeaderRow(CONCESSION_COLS),
+          ...concessionsData.map((cd, idx) =>
+            tableDataRow(CONCESSION_COLS, [cd.name, cd.concessions], idx),
+          ),
+        )
+      : null,
 
     // Comp Overview Table
-    el(Text, { style: s.sectionTitle }, "Comp Overview"),
+    el(Text, { style: { ...s.sectionTitleCompact, marginTop: 8 } }, "Comp Overview"),
     tableHeaderRow(COMP_COLS),
     ...active.map((c, idx) => {
       const avgRent =
@@ -798,118 +867,11 @@ function Page2(
       );
     }),
 
-    // Amenity Comparison
-    el(Text, { style: { ...s.sectionTitle, marginTop: 14 } }, "Amenity Comparison"),
-    el(
-      View,
-      { style: s.amenityRow },
-      // Community Amenities column
-      el(
-        View,
-        { style: s.amenityCol },
-        el(Text, { style: s.amenityColTitle }, "Community Amenities"),
-        ...communityAmenities.map((amenity, i) => {
-          const hasSub = subjectProperty
-            ? subjectProperty.communityAmenities.includes(amenity)
-            : false;
-          const compCount = active.filter((c) =>
-            c.communityAmenities.includes(amenity),
-          ).length;
-          const bg = i % 2 === 1 ? ROW_ALT : WHITE;
-          return el(
-            View,
-            {
-              key: String(i),
-              style: {
-                flexDirection: "row",
-                justifyContent: "space-between",
-                paddingVertical: 2,
-                paddingHorizontal: 4,
-                backgroundColor: bg,
-              },
-            },
-            el(Text, { style: { fontSize: 7, flex: 2 } }, amenity),
-            el(
-              Text,
-              { style: { fontSize: 7, flex: 0.5, textAlign: "center" } },
-              hasSub ? "\u2713" : "",
-            ),
-            el(
-              Text,
-              { style: { fontSize: 7, flex: 0.7, textAlign: "center", color: GRAY } },
-              compCount + "/" + active.length,
-            ),
-          );
-        }),
-      ),
-      // Unit Amenities column
-      el(
-        View,
-        { style: s.amenityCol },
-        el(Text, { style: s.amenityColTitle }, "In-Unit Amenities"),
-        ...unitAmenities.map((amenity, i) => {
-          const hasSub = subjectProperty
-            ? subjectProperty.unitAmenities.includes(amenity)
-            : false;
-          const compCount = active.filter((c) =>
-            c.unitAmenities.includes(amenity),
-          ).length;
-          const bg = i % 2 === 1 ? ROW_ALT : WHITE;
-          return el(
-            View,
-            {
-              key: String(i),
-              style: {
-                flexDirection: "row",
-                justifyContent: "space-between",
-                paddingVertical: 2,
-                paddingHorizontal: 4,
-                backgroundColor: bg,
-              },
-            },
-            el(Text, { style: { fontSize: 7, flex: 2 } }, amenity),
-            el(
-              Text,
-              { style: { fontSize: 7, flex: 0.5, textAlign: "center" } },
-              hasSub ? "\u2713" : "",
-            ),
-            el(
-              Text,
-              { style: { fontSize: 7, flex: 0.7, textAlign: "center", color: GRAY } },
-              compCount + "/" + active.length,
-            ),
-          );
-        }),
-      ),
-    ),
-
-    // Concessions
-    concessionsData.length > 0
-      ? el(
-          View,
-          null,
-          el(
-            Text,
-            { style: { ...s.sectionTitle, marginTop: 14 } },
-            "Concessions",
-          ),
-          tableHeaderRow(CONCESSION_COLS),
-          ...concessionsData.map((cd, idx) =>
-            tableDataRow(
-              CONCESSION_COLS,
-              [cd.name, cd.concessions],
-              idx,
-            ),
-          ),
-        )
-      : null,
-
-    // Footer
     Footer(preparedBy, surveyDate, 2),
   );
 }
 
-/* ── Subject Property Detail Page ──────────────────────────────────────────── */
+/* ── Subject Property Detail Page (compact, one-pager) ────────────────────── */
 
 function SubjectDetailPage(
   property: Property,
@@ -922,31 +884,34 @@ function SubjectDetailPage(
 
   return el(
     Page,
-    { size: "LETTER", orientation: "landscape", style: s.page },
+    { size: "LETTER", orientation: "landscape", style: s.pageCompact },
 
     Header(property, preparedBy, surveyDate),
 
     // Title
     SectionBar("Subject Property Detail — " + property.name),
 
-    // Property Info section
+    // Property Info — 3-column grid
     el(
       View,
-      { style: s.detailTwoCol },
+      { style: s.detailThreeCol },
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
         DetailField("Name", property.name),
         DetailField("Address", property.address, true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
         DetailField("City", property.city),
         DetailField("Total Units", String(property.totalUnits), true),
       ),
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
         DetailField("Year Built", sp?.yearBuilt || "—"),
         DetailField("Leased%", fmtPct(sp?.leasedPct), true),
-        DetailField("Occupancy%", fmtPct(sp?.occupancyPct)),
       ),
     ),
 
@@ -968,80 +933,99 @@ function SubjectDetailPage(
       ),
     ),
 
-    // Cost to Rent section
+    // Cost to Rent — 3-column grid
     SectionBar("Cost to Rent"),
     el(
       View,
-      { style: s.detailTwoCol },
+      { style: s.detailThreeCol },
       el(
         View,
-        { style: s.detailColHalf },
-        DetailField("Application Fee", fmtCurrency(sp?.applicationFee)),
+        { style: s.detailColThird },
+        DetailField("App Fee", fmtCurrency(sp?.applicationFee)),
         DetailField("Admin Fee", fmtCurrency(sp?.adminFee), true),
-        DetailField("Security Deposit", fmtCurrency(sp?.securityDeposit)),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Deposit", fmtCurrency(sp?.securityDeposit)),
         DetailField("MTM Fee", fmtCurrency(sp?.mtmFee), true),
       ),
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
         DetailField("Utilities", sp?.utilitiesIncluded || "—"),
         DetailField(
           "Other Fees",
           sp?.otherFees && sp.otherFees.length > 0
-            ? sp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", ")
+            ? truncate(sp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", "), 60)
             : "—",
           true,
         ),
       ),
     ),
 
-    // Specials
+    // Specials — inline
     SectionBar("Specials"),
-    DetailField("Concessions", sp?.concessions || "—"),
-    DetailField(
-      "Resident Referrals",
-      sp?.residentReferrals ? "Yes" + (sp.referralAmount != null ? " — " + fmtCurrency(sp.referralAmount) : "") : "No",
-      true,
-    ),
-
-    // Amenities
-    SectionBar("Amenities"),
-    DetailField("Community", sp?.communityAmenities?.join(", ") || "—"),
-    DetailField("In-Unit", sp?.unitAmenities?.join(", ") || "—", true),
-
-    // Pets
-    SectionBar("Pets"),
     el(
       View,
       { style: s.detailTwoCol },
       el(
         View,
         { style: s.detailColHalf },
-        DetailField("Pet Limit", sp?.petLimit || "—"),
-        DetailField("Pet Deposit", fmtCurrency(sp?.petDeposit), true),
-        DetailField("Pet Rent", fmtCurrency(sp?.petRent)),
+        DetailField("Concessions", truncate(sp?.concessions || "—", 80)),
       ),
       el(
         View,
         { style: s.detailColHalf },
-        DetailField("Pet Fee", fmtCurrency(sp?.petFee)),
-        DetailField("Pet Rules", sp?.petRules || "—", true),
+        DetailField(
+          "Referrals",
+          sp?.residentReferrals ? "Yes" + (sp.referralAmount != null ? " — " + fmtCurrency(sp.referralAmount) : "") : "No",
+        ),
       ),
     ),
 
-    // Notes
+    // Amenities — comma-separated text
+    SectionBar("Amenities"),
+    DetailField("Community", truncate(sp?.communityAmenities?.join(", ") || "—", 120)),
+    DetailField("In-Unit", truncate(sp?.unitAmenities?.join(", ") || "—", 120), true),
+
+    // Pets — 3-column grid
+    SectionBar("Pets"),
+    el(
+      View,
+      { style: s.detailThreeCol },
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Limit", sp?.petLimit || "—"),
+        DetailField("Pet Deposit", fmtCurrency(sp?.petDeposit), true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Rent", fmtCurrency(sp?.petRent)),
+        DetailField("Pet Fee", fmtCurrency(sp?.petFee), true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Rules", truncate(sp?.petRules || "—", 60)),
+      ),
+    ),
+
+    // Notes — truncated
     SectionBar("Notes"),
     el(
       View,
-      { style: { paddingHorizontal: 4, marginTop: 4 } },
-      el(Text, { style: s.notesText }, sp?.otherNotes || "—"),
+      { style: { paddingHorizontal: 3, marginTop: 2 } },
+      el(Text, { style: s.notesText }, truncate(sp?.otherNotes || "—", 200)),
     ),
 
     Footer(preparedBy, surveyDate, pageNum),
   );
 }
 
-/* ── Comp Detail Page ──────────────────────────────────────────────────────── */
+/* ── Comp Detail Page (compact, one comp per page) ────────────────────────── */
 
 function CompDetailPage(
   property: Property,
@@ -1052,35 +1036,55 @@ function CompDetailPage(
 ) {
   return el(
     Page,
-    { size: "LETTER", orientation: "landscape", style: s.page },
+    { size: "LETTER", orientation: "landscape", style: s.pageCompact },
 
     Header(property, preparedBy, surveyDate),
 
     // Title
     SectionBar("Comp Detail — " + comp.name),
 
-    // Property Info section
+    // Property Info — 3-column grid
     el(
       View,
-      { style: s.detailTwoCol },
+      { style: s.detailThreeCol },
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
         DetailField("Name", comp.name),
         DetailField("Address", comp.address, true),
-        DetailField("City/State", comp.cityState || "—"),
-        DetailField("Total Units", String(comp.totalUnits), true),
-        DetailField("Year Built", comp.yearBuilt || "—"),
       ),
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
+        DetailField("City/State", comp.cityState || "—"),
+        DetailField("Total Units", String(comp.totalUnits), true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Year Built", comp.yearBuilt || "—"),
+        DetailField("Distance", comp.distanceFromSubject || "—", true),
+      ),
+    ),
+
+    // Status row — 3-column
+    el(
+      View,
+      { style: s.detailThreeCol },
+      el(
+        View,
+        { style: s.detailColThird },
         DetailField("Leased%", fmtPct(comp.leasedPct)),
-        DetailField("Occupancy%", fmtPct(comp.occupancyPct), true),
-        DetailField("Distance", comp.distanceFromSubject || "—"),
-        DetailField("Source", comp.source || "—", true),
-        DetailField("Called / Toured", (comp.called ? "Called" : "Not Called") + " / " + (comp.toured ? "Toured" : "Not Toured")),
-        DetailField("Phone", comp.phone || "—", true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Occupancy%", fmtPct(comp.occupancyPct)),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Called/Toured", (comp.called ? "Yes" : "No") + " / " + (comp.toured ? "Yes" : "No")),
       ),
     ),
 
@@ -1102,73 +1106,92 @@ function CompDetailPage(
       ),
     ),
 
-    // Cost to Rent section
+    // Cost to Rent — 3-column grid
     SectionBar("Cost to Rent"),
     el(
       View,
-      { style: s.detailTwoCol },
+      { style: s.detailThreeCol },
       el(
         View,
-        { style: s.detailColHalf },
-        DetailField("Application Fee", fmtCurrency(comp.applicationFee)),
+        { style: s.detailColThird },
+        DetailField("App Fee", fmtCurrency(comp.applicationFee)),
         DetailField("Admin Fee", fmtCurrency(comp.adminFee), true),
-        DetailField("Security Deposit", fmtCurrency(comp.securityDeposit)),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Deposit", fmtCurrency(comp.securityDeposit)),
         DetailField("MTM Fee", fmtCurrency(comp.mtmFee), true),
       ),
       el(
         View,
-        { style: s.detailColHalf },
+        { style: s.detailColThird },
         DetailField("Utilities", comp.utilitiesIncluded || "—"),
         DetailField(
           "Other Fees",
           comp.otherFees && comp.otherFees.length > 0
-            ? comp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", ")
+            ? truncate(comp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", "), 60)
             : "—",
           true,
         ),
       ),
     ),
 
-    // Specials
+    // Specials — inline
     SectionBar("Specials"),
-    DetailField("Concessions", comp.concessions || "—"),
-    DetailField(
-      "Resident Referrals",
-      comp.residentReferrals ? "Yes" + (comp.referralAmount != null ? " — " + fmtCurrency(comp.referralAmount) : "") : "No",
-      true,
-    ),
-
-    // Amenities
-    SectionBar("Amenities"),
-    DetailField("Community", comp.communityAmenities?.join(", ") || "—"),
-    DetailField("In-Unit", comp.unitAmenities?.join(", ") || "—", true),
-
-    // Pets
-    SectionBar("Pets"),
     el(
       View,
       { style: s.detailTwoCol },
       el(
         View,
         { style: s.detailColHalf },
-        DetailField("Pet Limit", comp.petLimit || "—"),
-        DetailField("Pet Deposit", fmtCurrency(comp.petDeposit), true),
-        DetailField("Pet Rent", fmtCurrency(comp.petRent)),
+        DetailField("Concessions", truncate(comp.concessions || "—", 80)),
       ),
       el(
         View,
         { style: s.detailColHalf },
-        DetailField("Pet Fee", fmtCurrency(comp.petFee)),
-        DetailField("Pet Rules", comp.petRules || "—", true),
+        DetailField(
+          "Referrals",
+          comp.residentReferrals ? "Yes" + (comp.referralAmount != null ? " — " + fmtCurrency(comp.referralAmount) : "") : "No",
+        ),
       ),
     ),
 
-    // Notes / AI Reasoning
+    // Amenities — comma-separated text
+    SectionBar("Amenities"),
+    DetailField("Community", truncate(comp.communityAmenities?.join(", ") || "—", 120)),
+    DetailField("In-Unit", truncate(comp.unitAmenities?.join(", ") || "—", 120), true),
+
+    // Pets — 3-column grid
+    SectionBar("Pets"),
+    el(
+      View,
+      { style: s.detailThreeCol },
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Limit", comp.petLimit || "—"),
+        DetailField("Pet Deposit", fmtCurrency(comp.petDeposit), true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Rent", fmtCurrency(comp.petRent)),
+        DetailField("Pet Fee", fmtCurrency(comp.petFee), true),
+      ),
+      el(
+        View,
+        { style: s.detailColThird },
+        DetailField("Pet Rules", truncate(comp.petRules || "—", 60)),
+      ),
+    ),
+
+    // Notes — truncated to ~200 chars
     SectionBar("Notes"),
     el(
       View,
-      { style: { paddingHorizontal: 4, marginTop: 4 } },
-      el(Text, { style: s.notesText }, comp.otherNotes || "—"),
+      { style: { paddingHorizontal: 3, marginTop: 2 } },
+      el(Text, { style: s.notesText }, truncate(comp.otherNotes || "—", 200)),
     ),
 
     Footer(preparedBy, surveyDate, pageNum),
@@ -1234,8 +1257,10 @@ function SummaryDocument(
   return el(
     Document,
     null,
-    Page1(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
-    Page2(property, subjectProperty, comps, preparedBy, surveyDate),
+    // Page 1: Cover page (light, visual)
+    CoverPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
+    // Page 2: Executive summary tables
+    ExecutiveSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate),
   );
 }
 
@@ -1253,12 +1278,13 @@ function DetailDocument(
   return el(
     Document,
     null,
-    // Pages 1-2: Same summary pages
-    Page1(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
-    Page2(property, subjectProperty, comps, preparedBy, surveyDate),
-    // Page 3: Subject property detail
+    // Page 1: Cover page (light, visual)
+    CoverPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
+    // Page 2: Executive summary tables
+    ExecutiveSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate),
+    // Page 3: Subject property detail (compact, one-pager)
     SubjectDetailPage(property, subjectProperty, preparedBy, surveyDate, 3),
-    // Pages 4+: One page per non-excluded comp
+    // Pages 4+: One page per non-excluded comp (compact, one-pager each)
     ...active.map((comp, idx) =>
       CompDetailPage(property, comp, preparedBy, surveyDate, 4 + idx),
     ),
