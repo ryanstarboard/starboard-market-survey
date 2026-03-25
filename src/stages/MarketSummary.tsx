@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import type { Property, SubjectProperty, Comp, RentRollSummary, FloorPlan } from "../lib/types";
 
 interface MarketSummaryProps {
@@ -474,6 +475,130 @@ function NotesSection({ comps }: { comps: Comp[] }) {
   );
 }
 
+/* ── map section ─────────────────────────────────────────────────────── */
+
+function MapSection({
+  property,
+  comps,
+}: {
+  property: Property | null;
+  comps: Comp[];
+}) {
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
+
+  const active = activeComps(comps);
+
+  useEffect(() => {
+    if (!property?.address) {
+      setLoading(false);
+      setUnavailable(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchMap() {
+      try {
+        const resp = await fetch("/api/map/static", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: { address: property!.address, name: property!.name },
+            comps: active.map((c) => ({ address: c.address, name: c.name })),
+          }),
+        });
+
+        if (!resp.ok) {
+          if (!cancelled) {
+            setUnavailable(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const data = await resp.json();
+
+        if (!cancelled) {
+          if (data.mapUrl) {
+            setMapUrl(data.mapUrl);
+          } else {
+            setUnavailable(true);
+          }
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setUnavailable(true);
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchMap();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property?.address, active.length]);
+
+  if (unavailable && !loading) {
+    return (
+      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="text-sm text-slate-400 text-center">Map unavailable</p>
+      </section>
+    );
+  }
+
+  const googleMapsSearchUrl = property?.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
+    : "#";
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {loading ? (
+        <div className="flex items-center justify-center" style={{ height: 300 }}>
+          <svg
+            className="h-8 w-8 animate-spin text-slate-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+        </div>
+      ) : (
+        <>
+          <a href={googleMapsSearchUrl} target="_blank" rel="noopener noreferrer">
+            <img
+              src={mapUrl!}
+              alt="Market survey map"
+              className="w-full rounded-lg object-cover shadow-sm"
+              style={{ height: 300 }}
+            />
+          </a>
+
+          {/* Legend */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+              Subject: {property?.name ?? "Subject"}
+            </span>
+            {active.map((c, i) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5">
+                <span className="relative inline-flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 text-[7px] font-bold leading-none text-white">
+                  {i + 1}
+                </span>
+                {c.name}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 /* ── main component ──────────────────────────────────────────────────── */
 
 export default function MarketSummary({
@@ -497,6 +622,9 @@ export default function MarketSummary({
           Side-by-side comparison of your property versus {activeComps(comps).length} market comp{activeComps(comps).length !== 1 ? "s" : ""}.
         </p>
       </div>
+
+      {/* 0. Map */}
+      <MapSection property={property} comps={comps} />
 
       {/* 1. Overview Cards */}
       <OverviewCards
