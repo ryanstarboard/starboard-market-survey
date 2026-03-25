@@ -16,8 +16,10 @@ export function MapEmbed({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const compAddresses = comps.map((c) => c.address).join("|");
-  const compNames = comps.map((c) => c.name).join("|");
+  // Filter out comps with no address
+  const validComps = comps.filter((c) => c.address && c.address.trim());
+  const compAddresses = validComps.map((c) => c.address).join("|");
+  const compNames = validComps.map((c) => c.name).join("|");
 
   const params = new URLSearchParams();
   params.set("subject", subjectAddress);

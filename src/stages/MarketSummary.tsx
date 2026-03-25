@@ -150,7 +150,13 @@ function OverviewCards({
   const compOccs = active.map((c) => c.occupancyPct).filter((o): o is number => o != null);
   const marketAvgOcc = compOccs.length > 0 ? avg(compOccs) : null;
 
-  // Rent position
+  // Ad rent avg
+  const yourAdRents = subjectPlans
+    .map((p) => p.adRent)
+    .filter((r): r is number => r != null);
+  const yourAvgAdRent = yourAdRents.length > 0 ? avg(yourAdRents) : null;
+
+  // Rent position (in-place)
   let positionLabel = "—";
   let positionColor = "text-slate-600";
   let positionPct: number | null = null;
@@ -168,9 +174,27 @@ function OverviewCards({
     }
   }
 
+  // Ad rent position
+  let adPositionLabel = "—";
+  let adPositionColor = "text-slate-600";
+  let adPositionPct: number | null = null;
+  if (yourAvgAdRent != null && marketAvgRent != null && marketAvgRent !== 0) {
+    adPositionPct = ((yourAvgAdRent - marketAvgRent) / marketAvgRent) * 100;
+    if (Math.abs(adPositionPct) < 1) {
+      adPositionLabel = "At Market";
+      adPositionColor = "text-slate-600";
+    } else if (adPositionPct > 0) {
+      adPositionLabel = "Above Market";
+      adPositionColor = "text-emerald-600";
+    } else {
+      adPositionLabel = "Below Market";
+      adPositionColor = "text-red-600";
+    }
+  }
+
   const cards = [
     {
-      label: "Your Avg Rent vs Market",
+      label: "In-Place Rent vs Market",
       value: fmt$(yourAvgRent) + " / " + fmt$(marketAvgRent),
       color:
         yourAvgRent != null && marketAvgRent != null
@@ -178,6 +202,26 @@ function OverviewCards({
             ? "text-emerald-600"
             : "text-red-600"
           : "text-slate-600",
+    },
+    {
+      label: "Ad Rent vs Market",
+      value: fmt$(yourAvgAdRent) + " / " + fmt$(marketAvgRent),
+      color:
+        yourAvgAdRent != null && marketAvgRent != null
+          ? yourAvgAdRent >= marketAvgRent
+            ? "text-emerald-600"
+            : "text-red-600"
+          : "text-slate-600",
+    },
+    {
+      label: "In-Place Position",
+      value: positionLabel + (positionPct != null ? ` (${positionPct > 0 ? "+" : ""}${positionPct.toFixed(1)}%)` : ""),
+      color: positionColor,
+    },
+    {
+      label: "Ad Rent Position",
+      value: yourAvgAdRent != null ? adPositionLabel + (adPositionPct != null ? ` (${adPositionPct > 0 ? "+" : ""}${adPositionPct.toFixed(1)}%)` : "") : "Not set",
+      color: yourAvgAdRent != null ? adPositionColor : "text-slate-400",
     },
     {
       label: "Your Occupancy vs Market",
@@ -194,15 +238,10 @@ function OverviewCards({
       value: String(active.length),
       color: "text-blue-600",
     },
-    {
-      label: "Rent Position",
-      value: positionLabel + (positionPct != null ? ` (${positionPct > 0 ? "+" : ""}${positionPct.toFixed(1)}%)` : ""),
-      color: positionColor,
-    },
   ];
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map((c) => (
         <div
           key={c.label}
