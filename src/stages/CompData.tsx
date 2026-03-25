@@ -374,7 +374,7 @@ export default function CompData({ comps, onCompsChange, property, rentRoll }: C
         <MapEmbed
           subjectAddress={property.address}
           subjectName={property.name}
-          comps={activeComps.map((c) => ({ address: c.address, name: c.name }))}
+          comps={activeComps.map((c) => ({ address: c.address, name: c.name, cityState: c.cityState }))}
         />
       )}
 

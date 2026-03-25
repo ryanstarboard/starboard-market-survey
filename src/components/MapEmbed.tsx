@@ -3,7 +3,7 @@ import { useState } from "react";
 interface MapEmbedProps {
   subjectAddress: string;
   subjectName: string;
-  comps: { address: string; name: string }[];
+  comps: { address: string; name: string; cityState?: string }[];
   height?: number;
 }
 
@@ -16,9 +16,16 @@ export function MapEmbed({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Filter out comps with no address
+  // Filter out comps with no address, append cityState for better geocoding
   const validComps = comps.filter((c) => c.address && c.address.trim());
-  const compAddresses = validComps.map((c) => c.address).join("|");
+  const compAddresses = validComps.map((c) => {
+    const addr = c.address.trim();
+    // If address doesn't already contain city/state info, append it
+    if (c.cityState && !addr.includes(",")) {
+      return `${addr}, ${c.cityState}`;
+    }
+    return addr;
+  }).join("|");
   const compNames = validComps.map((c) => c.name).join("|");
 
   const params = new URLSearchParams();

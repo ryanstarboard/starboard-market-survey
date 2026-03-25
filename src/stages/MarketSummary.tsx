@@ -550,7 +550,7 @@ function MapSection({
       <MapEmbed
         subjectAddress={property.address}
         subjectName={property.name}
-        comps={active.map((c) => ({ address: c.address, name: c.name }))}
+        comps={active.map((c) => ({ address: c.address, name: c.name, cityState: c.cityState }))}
         height={350}
       />
       {/* Legend */}
