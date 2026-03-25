@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
 import type { Property, SubjectProperty, Comp, RentRollSummary, FloorPlan } from "../lib/types";
+import { MapEmbed } from "../components/MapEmbed";
 
 interface MarketSummaryProps {
   property: Property | null;
@@ -53,13 +53,17 @@ function collectUnitTypes(
 interface RentRow {
   type: string;
   yourRent: number | null;
+  yourAdRent: number | null;
   yourSqft: number | null;
   yourPsf: number | null;
+  yourAdPsf: number | null;
   marketRent: number | null;
   marketSqft: number | null;
   marketPsf: number | null;
   diff: number | null;
   diffPct: number | null;
+  diffAd: number | null;
+  diffAdPct: number | null;
 }
 
 function buildRentRows(
@@ -76,8 +80,10 @@ function buildRentRows(
     const sp = subjectPlans.find((p) => p.type === type);
     const rrRow = rrByType?.find((r) => r.type === type);
     const yourRent = sp?.rent ?? rrRow?.avgRent ?? null;
+    const yourAdRent = sp?.adRent ?? null;
     const yourSqft = sp?.sqft ?? rrRow?.avgSqft ?? null;
     const yourPsf = psfCalc(yourRent, yourSqft);
+    const yourAdPsf = psfCalc(yourAdRent, yourSqft);
 
     // Market avg from comps
     const matchingPlans = active.flatMap((c) =>
@@ -95,7 +101,13 @@ function buildRentRows(
         ? (diff / marketRent) * 100
         : null;
 
-    return { type, yourRent, yourSqft, yourPsf, marketRent, marketSqft, marketPsf, diff, diffPct };
+    const diffAd = yourAdRent != null && marketRent != null ? yourAdRent - marketRent : null;
+    const diffAdPct =
+      diffAd != null && marketRent != null && marketRent !== 0
+        ? (diffAd / marketRent) * 100
+        : null;
+
+    return { type, yourRent, yourAdRent, yourSqft, yourPsf, yourAdPsf, marketRent, marketSqft, marketPsf, diff, diffPct, diffAd, diffAdPct };
   });
 }
 
@@ -215,14 +227,14 @@ function RentComparisonTable({ rows }: { rows: RentRow[] }) {
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
               <th className="py-2 pr-4">Unit Type</th>
-              <th className="py-2 pr-4 text-right">Your Rent</th>
-              <th className="py-2 pr-4 text-right">Your SF</th>
+              <th className="py-2 pr-4 text-right">In-Place Rent</th>
+              <th className="py-2 pr-4 text-right">Ad Rent</th>
               <th className="py-2 pr-4 text-right">Your PSF</th>
-              <th className="py-2 pr-4 text-right">Market Avg Rent</th>
-              <th className="py-2 pr-4 text-right">Market Avg SF</th>
-              <th className="py-2 pr-4 text-right">Market Avg PSF</th>
-              <th className="py-2 pr-4 text-right">Diff ($)</th>
-              <th className="py-2 text-right">Diff (%)</th>
+              <th className="py-2 pr-4 text-right">Ad PSF</th>
+              <th className="py-2 pr-4 text-right">Market Avg</th>
+              <th className="py-2 pr-4 text-right">Market PSF</th>
+              <th className="py-2 pr-4 text-right">Diff vs In-Place</th>
+              <th className="py-2 text-right">Diff vs Ad</th>
             </tr>
           </thead>
           <tbody>
@@ -237,16 +249,16 @@ function RentComparisonTable({ rows }: { rows: RentRow[] }) {
               <tr key={r.type} className="border-b border-slate-100">
                 <td className="py-2 pr-4 font-medium text-slate-700">{r.type}</td>
                 <td className="py-2 pr-4 text-right text-slate-700">{fmt$(r.yourRent)}</td>
-                <td className="py-2 pr-4 text-right text-slate-700">{r.yourSqft != null ? r.yourSqft.toLocaleString() : "—"}</td>
+                <td className="py-2 pr-4 text-right text-slate-700">{fmt$(r.yourAdRent)}</td>
                 <td className="py-2 pr-4 text-right text-slate-700">{fmtPsf(r.yourPsf)}</td>
+                <td className="py-2 pr-4 text-right text-slate-700">{fmtPsf(r.yourAdPsf)}</td>
                 <td className="py-2 pr-4 text-right text-slate-700">{fmt$(r.marketRent)}</td>
-                <td className="py-2 pr-4 text-right text-slate-700">{r.marketSqft != null ? Math.round(r.marketSqft).toLocaleString() : "—"}</td>
                 <td className="py-2 pr-4 text-right text-slate-700">{fmtPsf(r.marketPsf)}</td>
                 <td className={`py-2 pr-4 text-right font-medium ${diffColor(r.diff)}`}>
-                  {r.diff != null ? (r.diff >= 0 ? "+" : "") + fmt$(r.diff) : "—"}
+                  {r.diff != null ? (r.diff >= 0 ? "+" : "") + fmt$(r.diff) + ` (${(r.diffPct ?? 0) >= 0 ? "+" : ""}${r.diffPct?.toFixed(1) ?? ""}%)` : "\u2014"}
                 </td>
-                <td className={`py-2 text-right font-medium ${diffColor(r.diffPct)}`}>
-                  {r.diffPct != null ? (r.diffPct >= 0 ? "+" : "") + r.diffPct.toFixed(1) + "%" : "—"}
+                <td className={`py-2 text-right font-medium ${diffColor(r.diffAd)}`}>
+                  {r.diffAd != null ? (r.diffAd >= 0 ? "+" : "") + fmt$(r.diffAd) + ` (${(r.diffAdPct ?? 0) >= 0 ? "+" : ""}${r.diffAdPct?.toFixed(1) ?? ""}%)` : "\u2014"}
                 </td>
               </tr>
             ))}
@@ -484,64 +496,9 @@ function MapSection({
   property: Property | null;
   comps: Comp[];
 }) {
-  const [mapUrl, setMapUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState(false);
-
   const active = activeComps(comps);
 
-  useEffect(() => {
-    if (!property?.address) {
-      setLoading(false);
-      setUnavailable(true);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchMap() {
-      try {
-        const resp = await fetch("/api/map/static", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subject: { address: property!.address, name: property!.name },
-            comps: active.map((c) => ({ address: c.address, name: c.name })),
-          }),
-        });
-
-        if (!resp.ok) {
-          if (!cancelled) {
-            setUnavailable(true);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const data = await resp.json();
-
-        if (!cancelled) {
-          if (data.mapUrl) {
-            setMapUrl(data.mapUrl);
-          } else {
-            setUnavailable(true);
-          }
-          setLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setUnavailable(true);
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchMap();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property?.address, active.length]);
-
-  if (unavailable && !loading) {
+  if (!property?.address) {
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm text-slate-400 text-center">Map unavailable</p>
@@ -549,53 +506,30 @@ function MapSection({
     );
   }
 
-  const googleMapsSearchUrl = property?.address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`
-    : "#";
-
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      {loading ? (
-        <div className="flex items-center justify-center" style={{ height: 300 }}>
-          <svg
-            className="h-8 w-8 animate-spin text-slate-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-          </svg>
-        </div>
-      ) : (
-        <>
-          <a href={googleMapsSearchUrl} target="_blank" rel="noopener noreferrer">
-            <img
-              src={mapUrl!}
-              alt="Market survey map"
-              className="w-full rounded-lg object-cover shadow-sm"
-              style={{ height: 300 }}
-            />
-          </a>
-
-          {/* Legend */}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
-              Subject: {property?.name ?? "Subject"}
+    <div>
+      <MapEmbed
+        subjectAddress={property.address}
+        subjectName={property.name}
+        comps={active.map((c) => ({ address: c.address, name: c.name }))}
+        height={350}
+      />
+      {/* Legend */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 px-2">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+          Subject: {property.name}
+        </span>
+        {active.map((c, i) => (
+          <span key={c.id} className="inline-flex items-center gap-1.5">
+            <span className="relative inline-flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 text-[7px] font-bold leading-none text-white">
+              {i + 1}
             </span>
-            {active.map((c, i) => (
-              <span key={c.id} className="inline-flex items-center gap-1.5">
-                <span className="relative inline-flex h-3 w-3 items-center justify-center rounded-full bg-blue-500 text-[7px] font-bold leading-none text-white">
-                  {i + 1}
-                </span>
-                {c.name}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
+            {c.name}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

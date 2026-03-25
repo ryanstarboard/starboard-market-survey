@@ -4,6 +4,7 @@ import { CompCard } from "../components/CompCard";
 import ExcludeModal from "../components/ExcludeModal";
 import { fetchCompSuggestions } from "../lib/api";
 import type { CompSuggestion } from "../lib/api";
+import { MapEmbed } from "../components/MapEmbed";
 
 interface CompDataProps {
   comps: Comp[];
@@ -66,6 +67,7 @@ function suggestionToComp(s: CompSuggestion): Comp {
     unitCount: null,
     leasedPct: null,
     rent: fp.rent || null,
+    adRent: null,
     psf: fp.sqft && fp.rent ? Math.round((fp.rent / fp.sqft) * 100) / 100 : null,
   }));
 
@@ -366,6 +368,15 @@ export default function CompData({ comps, onCompsChange, property, rentRoll }: C
           </div>
         )}
       </div>
+
+      {/* Map */}
+      {property && activeComps.length > 0 && (
+        <MapEmbed
+          subjectAddress={property.address}
+          subjectName={property.name}
+          comps={activeComps.map((c) => ({ address: c.address, name: c.name }))}
+        />
+      )}
 
       {/* AI Error */}
       {aiError && (

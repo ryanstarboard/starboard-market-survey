@@ -28,6 +28,7 @@ function createDefault(rentRoll: RentRollSummary | null): SubjectPropertyType {
         unitCount: bt.count,
         leasedPct: bt.leasedPct ?? null,
         rent: Math.round(bt.avgRent),
+        adRent: null,
         psf:
           bt.avgSqft && bt.avgRent
             ? Math.round((bt.avgRent / bt.avgSqft) * 100) / 100

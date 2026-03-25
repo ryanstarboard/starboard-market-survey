@@ -7,13 +7,23 @@ interface FloorPlanTableProps {
 }
 
 function formatCurrency(val: number | null): string {
-  if (val === null || val === undefined) return "—";
+  if (val === null || val === undefined) return "\u2014";
   return "$" + val.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 function formatPsf(rent: number | null, sqft: number | null): string {
-  if (!rent || !sqft || sqft === 0) return "—";
+  if (!rent || !sqft || sqft === 0) return "\u2014";
   return "$" + (rent / sqft).toFixed(2);
+}
+
+type ColumnKey = keyof FloorPlan | "adPsf";
+
+interface ColumnDef {
+  key: ColumnKey;
+  label: string;
+  width: string;
+  format?: (v: any) => string;
+  inputType?: string;
 }
 
 export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
@@ -47,6 +57,7 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
       unitCount: null,
       leasedPct: null,
       rent: null,
+      adRent: null,
       psf: null,
     };
     onChange([...floorPlans, blank]);
@@ -56,14 +67,18 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
     onChange(floorPlans.filter((_, i) => i !== index));
   };
 
-  const columns: { key: keyof FloorPlan; label: string; width: string; format?: (v: any) => string; inputType?: string }[] = [
+  const columns: ColumnDef[] = [
     { key: "type", label: "Floor Plan", width: "w-28" },
     { key: "sqft", label: "SF", width: "w-20", inputType: "number" },
     { key: "unitCount", label: "# Units", width: "w-20", inputType: "number" },
-    { key: "leasedPct", label: "Leased %", width: "w-20", inputType: "number", format: (v: number | null) => (v !== null && v !== undefined ? `${v}%` : "—") },
-    { key: "rent", label: "Rent", width: "w-24", inputType: "number", format: (v: number | null) => formatCurrency(v) },
+    { key: "leasedPct", label: "Leased %", width: "w-20", inputType: "number", format: (v: number | null) => (v !== null && v !== undefined ? `${v}%` : "\u2014") },
+    { key: "rent", label: "In-Place Rent", width: "w-24", inputType: "number", format: (v: number | null) => formatCurrency(v) },
+    { key: "adRent", label: "Ad Rent", width: "w-24", inputType: "number", format: (v: number | null) => formatCurrency(v) },
     { key: "psf", label: "PSF", width: "w-20" },
+    { key: "adPsf", label: "Ad PSF", width: "w-20" },
   ];
+
+  const totalCols = columns.length + 1; // +1 for delete button column
 
   return (
     <div>
@@ -87,8 +102,9 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
               {columns.map((col) => {
                 const isEditing = editingCell?.row === rowIdx && editingCell?.col === col.key;
                 const isPsf = col.key === "psf";
-                const rawValue = plan[col.key];
+                const isAdPsf = col.key === "adPsf";
 
+                // Auto-calculated PSF (in-place rent / sqft)
                 if (isPsf) {
                   return (
                     <td key={col.key} className="px-2 py-1 text-slate-500 italic">
@@ -96,6 +112,17 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
                     </td>
                   );
                 }
+
+                // Auto-calculated Ad PSF (ad rent / sqft)
+                if (isAdPsf) {
+                  return (
+                    <td key={col.key} className="px-2 py-1 text-slate-500 italic">
+                      {formatPsf(plan.adRent, plan.sqft)}
+                    </td>
+                  );
+                }
+
+                const rawValue = plan[col.key as keyof FloorPlan];
 
                 if (isEditing) {
                   return (
@@ -106,7 +133,7 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
                         className="w-full px-1 py-0.5 border border-blue-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         defaultValue={rawValue !== null && rawValue !== undefined ? String(rawValue) : ""}
                         onBlur={(e) => {
-                          updatePlan(rowIdx, col.key, e.target.value);
+                          updatePlan(rowIdx, col.key as keyof FloorPlan, e.target.value);
                           setEditingCell(null);
                         }}
                         onKeyDown={(e) => {
@@ -125,7 +152,7 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
                   ? col.format(rawValue)
                   : rawValue !== null && rawValue !== undefined && rawValue !== ""
                     ? String(rawValue)
-                    : "—";
+                    : "\u2014";
 
                 return (
                   <td
@@ -150,8 +177,8 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
           ))}
           {floorPlans.length === 0 && (
             <tr>
-              <td colSpan={7} className="text-center text-slate-400 py-4 text-sm italic">
-                No floor plans. Click "Add Row" to start.
+              <td colSpan={totalCols} className="text-center text-slate-400 py-4 text-sm italic">
+                No floor plans. Click &quot;Add Row&quot; to start.
               </td>
             </tr>
           )}

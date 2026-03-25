@@ -61,6 +61,7 @@ export interface FloorPlan {
   unitCount: number | null;
   leasedPct: number | null;
   rent: number | null;
+  adRent: number | null;
   psf: number | null;
 }
 
