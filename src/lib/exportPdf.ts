@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet, pdf } from "@react-pdf/renderer";
 import { createElement } from "react";
 import type {
   Property,
@@ -257,6 +257,19 @@ const s = StyleSheet.create({
     marginBottom: 6,
     marginTop: 10,
   },
+  // Section header with navy background
+  sectionHeaderBar: {
+    backgroundColor: NAVY,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  sectionHeaderBarText: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: WHITE,
+  },
   // KPI boxes
   kpiRow: {
     flexDirection: "row",
@@ -332,6 +345,53 @@ const s = StyleSheet.create({
     color: NAVY,
     marginBottom: 4,
   },
+  // Detail page styles
+  detailRow: {
+    flexDirection: "row",
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  detailLabel: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: GRAY,
+    width: 100,
+  },
+  detailValue: {
+    fontSize: 7,
+    color: NAVY,
+    flex: 1,
+  },
+  detailTwoCol: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  detailColHalf: {
+    flex: 1,
+  },
+  notesText: {
+    fontSize: 7,
+    color: NAVY,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    backgroundColor: ROW_ALT,
+    borderRadius: 2,
+  },
+  // Map placeholder
+  mapPlaceholder: {
+    height: 200,
+    backgroundColor: ROW_ALT,
+    borderRadius: 4,
+    border: `1 solid ${BORDER}`,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  mapPlaceholderText: {
+    fontSize: 8,
+    color: GRAY,
+    textAlign: "center",
+  },
 });
 
 /* ── Rent comparison column widths (proportional) ─────────────────────────── */
@@ -369,6 +429,15 @@ const COMP_COLS = [
 const CONCESSION_COLS = [
   { label: "Comp Name", flex: 1.5 },
   { label: "Concessions", flex: 3 },
+];
+
+const DETAIL_FP_COLS = [
+  { label: "Type", flex: 1.2 },
+  { label: "SF", flex: 0.8 },
+  { label: "# Units", flex: 0.8 },
+  { label: "Leased%", flex: 0.8 },
+  { label: "Rent", flex: 1 },
+  { label: "PSF", flex: 0.8 },
 ];
 
 /* ── table building helpers ───────────────────────────────────────────────── */
@@ -412,6 +481,73 @@ function tableDataRow(
         el(Text, { style: { ...s.tableCell, color } }, values[i] ?? ""),
       );
     }),
+  );
+}
+
+/* ── Section header bar component ─────────────────────────────────────────── */
+
+function SectionBar(title: string) {
+  return el(
+    View,
+    { style: s.sectionHeaderBar },
+    el(Text, { style: s.sectionHeaderBarText }, title),
+  );
+}
+
+/* ── Detail field row component ───────────────────────────────────────────── */
+
+function DetailField(label: string, value: string, bgAlt?: boolean) {
+  return el(
+    View,
+    { style: { ...s.detailRow, backgroundColor: bgAlt ? ROW_ALT : WHITE } },
+    el(Text, { style: s.detailLabel }, label),
+    el(Text, { style: s.detailValue }, value),
+  );
+}
+
+/* ── Map placeholder / image component ────────────────────────────────────── */
+
+/**
+ * Renders the map section on Page 1.
+ * If mapDataUri is available, renders the actual map image.
+ * If not, renders a placeholder with the listed addresses.
+ *
+ * TODO: Replace placeholder with actual map image once GOOGLE_MAPS_API_KEY is configured.
+ * The map image will be fetched from the /api/map/static endpoint and passed as a
+ * base64 data URI to the Image component.
+ */
+function MapSection(
+  property: Property,
+  comps: Comp[],
+  mapDataUri: string | null,
+) {
+  if (mapDataUri) {
+    // Render actual map image
+    return el(
+      View,
+      { style: { marginBottom: 12 } },
+      el(Image, {
+        src: mapDataUri,
+        style: { width: "100%", height: 200 },
+      }),
+    );
+  }
+
+  // Placeholder — list addresses so the user knows what would appear
+  const active = activeComps(comps);
+  const addresses = [
+    property.address + ", " + property.city,
+    ...active.map((c) => c.address + (c.cityState ? ", " + c.cityState : "")),
+  ];
+
+  return el(
+    View,
+    { style: s.mapPlaceholder },
+    el(
+      Text,
+      { style: s.mapPlaceholderText },
+      "Map: [" + addresses.join("; ") + "]",
+    ),
   );
 }
 
@@ -471,6 +607,7 @@ function Page1(
   rentRoll: RentRollSummary | null,
   preparedBy: string,
   surveyDate: string,
+  mapDataUri: string | null,
 ) {
   const active = activeComps(comps);
   const subjAvg = subjectAvgRent(subjectProperty, rentRoll);
@@ -497,6 +634,9 @@ function Page1(
 
     // Header
     Header(property, preparedBy, surveyDate),
+
+    // Map section (image or placeholder)
+    MapSection(property, comps, mapDataUri),
 
     // KPI boxes
     el(Text, { style: s.sectionTitle }, "Market Position"),
@@ -604,7 +744,7 @@ function Page1(
   );
 }
 
-/* ── Page 2: Comp Details ──────────────────────────────────────────────────── */
+/* ── Page 2: Comp Overview ─────────────────────────────────────────────────── */
 
 function Page2(
   property: Property,
@@ -769,52 +909,369 @@ function Page2(
   );
 }
 
-/* ── Document builder ─────────────────────────────────────────────────────── */
+/* ── Subject Property Detail Page ──────────────────────────────────────────── */
 
-function SurveyDocument(
+function SubjectDetailPage(
+  property: Property,
+  subjectProperty: SubjectProperty | null,
+  preparedBy: string,
+  surveyDate: string,
+  pageNum: number,
+) {
+  const sp = subjectProperty;
+
+  return el(
+    Page,
+    { size: "LETTER", orientation: "landscape", style: s.page },
+
+    Header(property, preparedBy, surveyDate),
+
+    // Title
+    SectionBar("Subject Property Detail — " + property.name),
+
+    // Property Info section
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Name", property.name),
+        DetailField("Address", property.address, true),
+        DetailField("City", property.city),
+        DetailField("Total Units", String(property.totalUnits), true),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Year Built", sp?.yearBuilt || "—"),
+        DetailField("Leased%", fmtPct(sp?.leasedPct), true),
+        DetailField("Occupancy%", fmtPct(sp?.occupancyPct)),
+      ),
+    ),
+
+    // Floor Plans table
+    SectionBar("Floor Plans"),
+    tableHeaderRow(DETAIL_FP_COLS),
+    ...(sp?.floorPlans || []).map((fp, idx) =>
+      tableDataRow(
+        DETAIL_FP_COLS,
+        [
+          fp.type,
+          fp.sqft != null ? String(fp.sqft) : "—",
+          fp.unitCount != null ? String(fp.unitCount) : "—",
+          fmtPct(fp.leasedPct),
+          fmtCurrency(fp.rent),
+          fp.psf != null ? "$" + fp.psf.toFixed(2) : "—",
+        ],
+        idx,
+      ),
+    ),
+
+    // Cost to Rent section
+    SectionBar("Cost to Rent"),
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Application Fee", fmtCurrency(sp?.applicationFee)),
+        DetailField("Admin Fee", fmtCurrency(sp?.adminFee), true),
+        DetailField("Security Deposit", fmtCurrency(sp?.securityDeposit)),
+        DetailField("MTM Fee", fmtCurrency(sp?.mtmFee), true),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Utilities", sp?.utilitiesIncluded || "—"),
+        DetailField(
+          "Other Fees",
+          sp?.otherFees && sp.otherFees.length > 0
+            ? sp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", ")
+            : "—",
+          true,
+        ),
+      ),
+    ),
+
+    // Specials
+    SectionBar("Specials"),
+    DetailField("Concessions", sp?.concessions || "—"),
+    DetailField(
+      "Resident Referrals",
+      sp?.residentReferrals ? "Yes" + (sp.referralAmount != null ? " — " + fmtCurrency(sp.referralAmount) : "") : "No",
+      true,
+    ),
+
+    // Amenities
+    SectionBar("Amenities"),
+    DetailField("Community", sp?.communityAmenities?.join(", ") || "—"),
+    DetailField("In-Unit", sp?.unitAmenities?.join(", ") || "—", true),
+
+    // Pets
+    SectionBar("Pets"),
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Pet Limit", sp?.petLimit || "—"),
+        DetailField("Pet Deposit", fmtCurrency(sp?.petDeposit), true),
+        DetailField("Pet Rent", fmtCurrency(sp?.petRent)),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Pet Fee", fmtCurrency(sp?.petFee)),
+        DetailField("Pet Rules", sp?.petRules || "—", true),
+      ),
+    ),
+
+    // Notes
+    SectionBar("Notes"),
+    el(
+      View,
+      { style: { paddingHorizontal: 4, marginTop: 4 } },
+      el(Text, { style: s.notesText }, sp?.otherNotes || "—"),
+    ),
+
+    Footer(preparedBy, surveyDate, pageNum),
+  );
+}
+
+/* ── Comp Detail Page ──────────────────────────────────────────────────────── */
+
+function CompDetailPage(
+  property: Property,
+  comp: Comp,
+  preparedBy: string,
+  surveyDate: string,
+  pageNum: number,
+) {
+  return el(
+    Page,
+    { size: "LETTER", orientation: "landscape", style: s.page },
+
+    Header(property, preparedBy, surveyDate),
+
+    // Title
+    SectionBar("Comp Detail — " + comp.name),
+
+    // Property Info section
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Name", comp.name),
+        DetailField("Address", comp.address, true),
+        DetailField("City/State", comp.cityState || "—"),
+        DetailField("Total Units", String(comp.totalUnits), true),
+        DetailField("Year Built", comp.yearBuilt || "—"),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Leased%", fmtPct(comp.leasedPct)),
+        DetailField("Occupancy%", fmtPct(comp.occupancyPct), true),
+        DetailField("Distance", comp.distanceFromSubject || "—"),
+        DetailField("Source", comp.source || "—", true),
+        DetailField("Called / Toured", (comp.called ? "Called" : "Not Called") + " / " + (comp.toured ? "Toured" : "Not Toured")),
+        DetailField("Phone", comp.phone || "—", true),
+      ),
+    ),
+
+    // Floor Plans table
+    SectionBar("Floor Plans"),
+    tableHeaderRow(DETAIL_FP_COLS),
+    ...comp.floorPlans.map((fp, idx) =>
+      tableDataRow(
+        DETAIL_FP_COLS,
+        [
+          fp.type,
+          fp.sqft != null ? String(fp.sqft) : "—",
+          fp.unitCount != null ? String(fp.unitCount) : "—",
+          fmtPct(fp.leasedPct),
+          fmtCurrency(fp.rent),
+          fp.psf != null ? "$" + fp.psf.toFixed(2) : "—",
+        ],
+        idx,
+      ),
+    ),
+
+    // Cost to Rent section
+    SectionBar("Cost to Rent"),
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Application Fee", fmtCurrency(comp.applicationFee)),
+        DetailField("Admin Fee", fmtCurrency(comp.adminFee), true),
+        DetailField("Security Deposit", fmtCurrency(comp.securityDeposit)),
+        DetailField("MTM Fee", fmtCurrency(comp.mtmFee), true),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Utilities", comp.utilitiesIncluded || "—"),
+        DetailField(
+          "Other Fees",
+          comp.otherFees && comp.otherFees.length > 0
+            ? comp.otherFees.map((f) => f.name + ": " + fmtCurrency(f.amount)).join(", ")
+            : "—",
+          true,
+        ),
+      ),
+    ),
+
+    // Specials
+    SectionBar("Specials"),
+    DetailField("Concessions", comp.concessions || "—"),
+    DetailField(
+      "Resident Referrals",
+      comp.residentReferrals ? "Yes" + (comp.referralAmount != null ? " — " + fmtCurrency(comp.referralAmount) : "") : "No",
+      true,
+    ),
+
+    // Amenities
+    SectionBar("Amenities"),
+    DetailField("Community", comp.communityAmenities?.join(", ") || "—"),
+    DetailField("In-Unit", comp.unitAmenities?.join(", ") || "—", true),
+
+    // Pets
+    SectionBar("Pets"),
+    el(
+      View,
+      { style: s.detailTwoCol },
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Pet Limit", comp.petLimit || "—"),
+        DetailField("Pet Deposit", fmtCurrency(comp.petDeposit), true),
+        DetailField("Pet Rent", fmtCurrency(comp.petRent)),
+      ),
+      el(
+        View,
+        { style: s.detailColHalf },
+        DetailField("Pet Fee", fmtCurrency(comp.petFee)),
+        DetailField("Pet Rules", comp.petRules || "—", true),
+      ),
+    ),
+
+    // Notes / AI Reasoning
+    SectionBar("Notes"),
+    el(
+      View,
+      { style: { paddingHorizontal: 4, marginTop: 4 } },
+      el(Text, { style: s.notesText }, comp.otherNotes || "—"),
+    ),
+
+    Footer(preparedBy, surveyDate, pageNum),
+  );
+}
+
+/* ── Map image fetching helper ────────────────────────────────────────────── */
+
+/**
+ * Fetches a static map image from /api/map/static and returns it as a base64
+ * data URI suitable for use with the react-pdf Image component.
+ *
+ * Returns null if the API key is not configured or if anything fails.
+ * The map is optional — PDFs render fine without it.
+ */
+async function fetchMapImage(
+  subject: string,
+  compAddresses: string[],
+): Promise<string | null> {
+  try {
+    const resp = await fetch("/api/map/static", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: { address: subject },
+        comps: compAddresses.map((addr) => ({ address: addr })),
+      }),
+    });
+
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    if (!data.mapUrl) return null;
+
+    // Fetch the actual image and convert to base64 data URI
+    const imgResp = await fetch(data.mapUrl);
+    if (!imgResp.ok) return null;
+
+    const imgBlob = await imgResp.blob();
+    return new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(imgBlob);
+    });
+  } catch {
+    // Map is optional — gracefully degrade
+    return null;
+  }
+}
+
+/* ── Document builders ───────────────────────────────────────────────────── */
+
+function SummaryDocument(
   property: Property,
   subjectProperty: SubjectProperty | null,
   comps: Comp[],
   rentRoll: RentRollSummary | null,
   preparedBy: string,
   surveyDate: string,
+  mapDataUri: string | null,
 ) {
   return el(
     Document,
     null,
-    Page1(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate),
+    Page1(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
     Page2(property, subjectProperty, comps, preparedBy, surveyDate),
   );
 }
 
-/* ── Public export function ───────────────────────────────────────────────── */
-
-export async function exportToPdf(
+function DetailDocument(
   property: Property,
   subjectProperty: SubjectProperty | null,
   comps: Comp[],
   rentRoll: RentRollSummary | null,
   preparedBy: string,
   surveyDate: string,
-  comments: string,
-): Promise<void> {
-  const doc = SurveyDocument(
-    property,
-    subjectProperty,
-    comps,
-    rentRoll,
-    preparedBy || "—",
-    surveyDate || new Date().toISOString().slice(0, 10),
+  mapDataUri: string | null,
+) {
+  const active = activeComps(comps);
+
+  return el(
+    Document,
+    null,
+    // Pages 1-2: Same summary pages
+    Page1(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
+    Page2(property, subjectProperty, comps, preparedBy, surveyDate),
+    // Page 3: Subject property detail
+    SubjectDetailPage(property, subjectProperty, preparedBy, surveyDate, 3),
+    // Pages 4+: One page per non-excluded comp
+    ...active.map((comp, idx) =>
+      CompDetailPage(property, comp, preparedBy, surveyDate, 4 + idx),
+    ),
   );
+}
 
-  const blob = await pdf(doc).toBlob();
+/* ── Shared download helper ──────────────────────────────────────────────── */
 
-  // Build filename
+async function downloadPdfBlob(blob: Blob, property: Property, surveyDate: string, suffix: string) {
   const safeName = property.name.replace(/[^a-zA-Z0-9]/g, "_");
   const dateStr = surveyDate || new Date().toISOString().slice(0, 10);
-  const filename = "Market_Survey_" + safeName + "_" + dateStr + ".pdf";
+  const filename = "Market_Survey_" + suffix + "_" + safeName + "_" + dateStr + ".pdf";
 
-  // Trigger download
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -823,4 +1280,70 @@ export async function exportToPdf(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/* ── Resolve map image for both exports ──────────────────────────────────── */
+
+async function resolveMapImage(
+  property: Property,
+  comps: Comp[],
+): Promise<string | null> {
+  const active = activeComps(comps);
+  const subjectAddr = property.address + ", " + property.city;
+  const compAddrs = active.map(
+    (c) => c.address + (c.cityState ? ", " + c.cityState : ""),
+  );
+  return fetchMapImage(subjectAddr, compAddrs);
+}
+
+/* ── Public export functions ─────────────────────────────────────────────── */
+
+export async function exportPdfSummary(
+  property: Property,
+  subjectProperty: SubjectProperty | null,
+  comps: Comp[],
+  rentRoll: RentRollSummary | null,
+  preparedBy: string,
+  surveyDate: string,
+  comments: string,
+): Promise<void> {
+  const mapDataUri = await resolveMapImage(property, comps);
+
+  const doc = SummaryDocument(
+    property,
+    subjectProperty,
+    comps,
+    rentRoll,
+    preparedBy || "—",
+    surveyDate || new Date().toISOString().slice(0, 10),
+    mapDataUri,
+  );
+
+  const blob = await pdf(doc).toBlob();
+  await downloadPdfBlob(blob, property, surveyDate, "Summary");
+}
+
+export async function exportPdfDetail(
+  property: Property,
+  subjectProperty: SubjectProperty | null,
+  comps: Comp[],
+  rentRoll: RentRollSummary | null,
+  preparedBy: string,
+  surveyDate: string,
+  comments: string,
+): Promise<void> {
+  const mapDataUri = await resolveMapImage(property, comps);
+
+  const doc = DetailDocument(
+    property,
+    subjectProperty,
+    comps,
+    rentRoll,
+    preparedBy || "—",
+    surveyDate || new Date().toISOString().slice(0, 10),
+    mapDataUri,
+  );
+
+  const blob = await pdf(doc).toBlob();
+  await downloadPdfBlob(blob, property, surveyDate, "Detail");
 }

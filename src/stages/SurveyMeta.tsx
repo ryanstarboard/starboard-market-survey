@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Comp, Property, SubjectProperty, RentRollSummary } from "../lib/types";
 import { exportToExcel } from "../lib/export";
-import { exportToPdf } from "../lib/exportPdf";
+import { exportPdfSummary, exportPdfDetail } from "../lib/exportPdf";
 
 interface SurveyMetaProps {
   comps: Comp[];
@@ -32,13 +32,14 @@ export default function SurveyMeta({
   subjectProperty,
   rentRoll,
 }: SurveyMetaProps) {
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfSummaryLoading, setPdfSummaryLoading] = useState(false);
+  const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
 
-  const handlePdfExport = async () => {
+  const handlePdfSummary = async () => {
     if (!property) return;
-    setPdfLoading(true);
+    setPdfSummaryLoading(true);
     try {
-      await exportToPdf(
+      await exportPdfSummary(
         property,
         subjectProperty,
         comps,
@@ -48,10 +49,31 @@ export default function SurveyMeta({
         comments,
       );
     } catch (err) {
-      console.error("PDF export failed:", err);
-      alert("Failed to generate PDF. Please try again.");
+      console.error("PDF summary export failed:", err);
+      alert("Failed to generate PDF summary. Please try again.");
     } finally {
-      setPdfLoading(false);
+      setPdfSummaryLoading(false);
+    }
+  };
+
+  const handlePdfDetail = async () => {
+    if (!property) return;
+    setPdfDetailLoading(true);
+    try {
+      await exportPdfDetail(
+        property,
+        subjectProperty,
+        comps,
+        rentRoll,
+        preparedBy,
+        surveyDate,
+        comments,
+      );
+    } catch (err) {
+      console.error("PDF detail export failed:", err);
+      alert("Failed to generate PDF detail. Please try again.");
+    } finally {
+      setPdfDetailLoading(false);
     }
   };
 
@@ -112,7 +134,7 @@ export default function SurveyMeta({
         />
       </section>
 
-      {/* ── Export (placeholder) ─────────────────────────────────────── */}
+      {/* ── Export ─────────────────────────────────────────────────── */}
       <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-slate-800">Export</h2>
 
@@ -178,13 +200,13 @@ export default function SurveyMeta({
             Download Excel
           </button>
 
-          {/* PDF */}
+          {/* PDF Summary */}
           <button
-            disabled={!property || pdfLoading}
-            onClick={handlePdfExport}
+            disabled={!property || pdfSummaryLoading}
+            onClick={handlePdfSummary}
             className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${
-              property && !pdfLoading
-                ? "bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+              property && !pdfSummaryLoading
+                ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
                 : "bg-slate-100 text-slate-400 cursor-not-allowed"
             }`}
           >
@@ -202,7 +224,34 @@ export default function SurveyMeta({
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            {pdfLoading ? "Generating PDF..." : "Download PDF"}
+            {pdfSummaryLoading ? "Generating..." : "Download PDF Summary"}
+          </button>
+
+          {/* PDF Detail */}
+          <button
+            disabled={!property || pdfDetailLoading}
+            onClick={handlePdfDetail}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${
+              property && !pdfDetailLoading
+                ? "bg-slate-600 text-white hover:bg-slate-700 cursor-pointer"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+            }`}
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            {pdfDetailLoading ? "Generating..." : "Download PDF Detail"}
           </button>
         </div>
 
