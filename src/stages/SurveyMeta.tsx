@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { Comp, Property, SubjectProperty, RentRollSummary } from "../lib/types";
 import { exportToExcel } from "../lib/export";
+import { exportToPdf } from "../lib/exportPdf";
 
 interface SurveyMetaProps {
   comps: Comp[];
@@ -30,6 +32,28 @@ export default function SurveyMeta({
   subjectProperty,
   rentRoll,
 }: SurveyMetaProps) {
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handlePdfExport = async () => {
+    if (!property) return;
+    setPdfLoading(true);
+    try {
+      await exportToPdf(
+        property,
+        subjectProperty,
+        comps,
+        rentRoll,
+        preparedBy,
+        surveyDate,
+        comments,
+      );
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -156,9 +180,13 @@ export default function SurveyMeta({
 
           {/* PDF */}
           <button
-            disabled
-            title="Coming soon"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 shadow-sm cursor-not-allowed"
+            disabled={!property || pdfLoading}
+            onClick={handlePdfExport}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${
+              property && !pdfLoading
+                ? "bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
+            }`}
           >
             <svg
               className="h-4 w-4"
@@ -174,12 +202,12 @@ export default function SurveyMeta({
               <line x1="16" y1="13" x2="8" y2="13" />
               <line x1="16" y1="17" x2="8" y2="17" />
             </svg>
-            Download PDF
+            {pdfLoading ? "Generating PDF..." : "Download PDF"}
           </button>
         </div>
 
         <p className="mt-3 text-xs text-slate-400">
-          Google Sheets and PDF export coming soon.
+          Google Sheets export coming soon.
         </p>
       </section>
     </div>
