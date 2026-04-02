@@ -53,15 +53,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const imgResp = await fetch(mapUrl);
     if (!imgResp.ok) {
-      return res.status(200).json({ mapUrl, mapDataUri: null });
+      return res.status(200).json({ mapUrl, mapDataUri: null, error: `Google API returned ${imgResp.status}` });
+    }
+    const contentType = imgResp.headers.get("content-type") || "";
+    // Google returns text/html on errors (invalid key, over quota, etc.)
+    if (!contentType.startsWith("image/")) {
+      const body = await imgResp.text();
+      return res.status(200).json({ mapUrl, mapDataUri: null, error: "Google returned non-image: " + body.slice(0, 200) });
     }
     const arrayBuf = await imgResp.arrayBuffer();
     const base64 = Buffer.from(arrayBuf).toString("base64");
-    const contentType = imgResp.headers.get("content-type") || "image/png";
     const dataUri = `data:${contentType};base64,${base64}`;
     return res.status(200).json({ mapUrl, mapDataUri: dataUri });
-  } catch {
+  } catch (err) {
     // Fall back to URL-only if server-side fetch fails
-    return res.status(200).json({ mapUrl, mapDataUri: null });
+    return res.status(200).json({ mapUrl, mapDataUri: null, error: String(err) });
   }
 }

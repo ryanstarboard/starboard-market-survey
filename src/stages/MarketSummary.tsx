@@ -308,6 +308,117 @@ function RentComparisonTable({ rows }: { rows: RentRow[] }) {
   );
 }
 
+/* ── Unit Type Tables — one table per unit type, properties on Y axis ──── */
+
+function UnitTypeTables({
+  property,
+  subjectProperty,
+  comps,
+  rentRoll,
+}: {
+  property: Property | null;
+  subjectProperty: SubjectProperty | null;
+  comps: Comp[];
+  rentRoll: RentRollSummary | null;
+}) {
+  const active = activeComps(comps);
+  const subjectPlans = subjectProperty?.floorPlans ?? [];
+  const compPlanSets = active.map((c) => c.floorPlans);
+  const unitTypes = collectUnitTypes(subjectPlans, compPlanSets);
+
+  // Also include types from rent roll
+  const rrTypes = rentRoll?.byType.map((r) => r.type) ?? [];
+  const allTypes = Array.from(new Set([...unitTypes, ...rrTypes])).sort();
+
+  if (allTypes.length === 0) return null;
+
+  // Helper to get subject data for a unit type
+  function getSubjectData(type: string) {
+    const sp = subjectPlans.find((p) => p.type === type);
+    const rr = rentRoll?.byType.find((r) => r.type === type);
+    const rent = sp?.rent ?? rr?.avgRent ?? null;
+    const sqft = sp?.sqft ?? rr?.avgSqft ?? null;
+    const psf = rent != null && sqft != null && sqft > 0 ? rent / sqft : null;
+    return { rent, sqft, psf };
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="mb-4 text-lg font-semibold text-slate-800">
+        Unit Type Breakdown
+      </h2>
+      <div className="space-y-6">
+        {allTypes.map((type) => {
+          const subj = getSubjectData(type);
+          // Market average
+          const matchingPlans = active.flatMap((c) =>
+            c.floorPlans.filter((p) => p.type === type),
+          );
+          const mktRents = matchingPlans.map((p) => p.rent).filter((r): r is number => r != null);
+          const mktSqfts = matchingPlans.map((p) => p.sqft).filter((s): s is number => s != null);
+          const mktAvgRent = mktRents.length > 0 ? avg(mktRents) : null;
+          const mktAvgSqft = mktSqfts.length > 0 ? avg(mktSqfts) : null;
+          const mktAvgPsf = mktAvgRent != null && mktAvgSqft != null && mktAvgSqft > 0 ? mktAvgRent / mktAvgSqft : null;
+
+          return (
+            <div key={type}>
+              <h3 className="mb-2 text-sm font-bold text-blue-600">{type}</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="py-2 pr-4">Property</th>
+                      <th className="py-2 pr-4 text-right">SF</th>
+                      <th className="py-2 pr-4 text-right">$</th>
+                      <th className="py-2 text-right">$/SF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Subject row */}
+                    <tr className="border-b border-slate-100 bg-blue-50/40">
+                      <td className="py-2 pr-4 font-semibold text-blue-700">
+                        {property?.name ?? "Subject"} (Subject)
+                      </td>
+                      <td className="py-2 pr-4 text-right text-slate-700">
+                        {subj.sqft != null ? Math.round(subj.sqft).toLocaleString() : "—"}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-slate-700">{fmt$(subj.rent)}</td>
+                      <td className="py-2 text-right text-slate-700">{fmtPsf(subj.psf)}</td>
+                    </tr>
+                    {/* Comp rows */}
+                    {active.map((c) => {
+                      const fp = c.floorPlans.find((p) => p.type === type);
+                      return (
+                        <tr key={c.id} className="border-b border-slate-100">
+                          <td className="py-2 pr-4 font-medium text-slate-700">{c.name}</td>
+                          <td className="py-2 pr-4 text-right text-slate-700">
+                            {fp?.sqft != null ? Math.round(fp.sqft).toLocaleString() : "—"}
+                          </td>
+                          <td className="py-2 pr-4 text-right text-slate-700">{fmt$(fp?.rent)}</td>
+                          <td className="py-2 text-right text-slate-700">{fmtPsf(psfCalc(fp?.rent ?? null, fp?.sqft ?? null))}</td>
+                        </tr>
+                      );
+                    })}
+                    {/* Market average row */}
+                    <tr className="border-t-2 border-slate-300 font-semibold">
+                      <td className="py-2 pr-4 text-slate-800">Market Average</td>
+                      <td className="py-2 pr-4 text-right text-slate-800">
+                        {mktAvgSqft != null ? Math.round(mktAvgSqft).toLocaleString() : "—"}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-slate-800">{fmt$(mktAvgRent)}</td>
+                      <td className="py-2 text-right text-slate-800">{fmtPsf(mktAvgPsf)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function FeeComparisonTable({
   subjectProperty,
   comps,
@@ -609,6 +720,14 @@ export default function MarketSummary({
 
       {/* 2. Rent Comparison */}
       <RentComparisonTable rows={rentRows} />
+
+      {/* 2b. Unit Type Breakdown — one table per type */}
+      <UnitTypeTables
+        property={property}
+        subjectProperty={subjectProperty}
+        comps={comps}
+        rentRoll={rentRoll}
+      />
 
       {/* 3. Fee Comparison */}
       <FeeComparisonTable subjectProperty={subjectProperty} comps={comps} />

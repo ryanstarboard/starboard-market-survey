@@ -146,19 +146,20 @@ function subjectRentForType(
   unitType: string,
   subjectProperty: SubjectProperty | null,
   rentRoll: RentRollSummary | null,
-): { rent: number | null; psf: number | null } {
+): { rent: number | null; psf: number | null; sqft: number | null } {
   if (rentRoll) {
     const t = rentRoll.byType.find((r) => r.type === unitType);
     if (t) {
-      const psf = t.avgSqft != null && t.avgSqft > 0 ? t.avgRent / t.avgSqft : null;
-      return { rent: t.avgRent, psf };
+      const sqft = t.avgSqft ?? null;
+      const psf = sqft != null && sqft > 0 ? t.avgRent / sqft : null;
+      return { rent: t.avgRent, psf, sqft };
     }
   }
   if (subjectProperty) {
     const fp = findPlan(subjectProperty.floorPlans, unitType);
-    if (fp) return { rent: fp.rent, psf: fp.psf };
+    if (fp) return { rent: fp.rent, psf: fp.psf, sqft: fp.sqft };
   }
-  return { rent: null, psf: null };
+  return { rent: null, psf: null, sqft: null };
 }
 
 /** Fee value for subject */
@@ -1212,6 +1213,10 @@ async function fetchMapImage(
   compAddresses: string[],
 ): Promise<string | null> {
   try {
+    // Add a timeout so a slow map API doesn't block PDF generation
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
     const resp = await fetch("/api/map/static", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1219,27 +1224,21 @@ async function fetchMapImage(
         subject: { address: subject },
         comps: compAddresses.map((addr) => ({ address: addr })),
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (!resp.ok) return null;
 
     const data = await resp.json();
 
-    // Prefer server-side base64 (avoids CORS issues with Google Static Maps)
-    if (data.mapDataUri) return data.mapDataUri;
+    // Prefer server-side base64 data URI (avoids CORS issues)
+    if (data.mapDataUri && typeof data.mapDataUri === "string" && data.mapDataUri.startsWith("data:image/")) {
+      return data.mapDataUri;
+    }
 
-    // Fallback: try fetching the URL from the browser (may hit CORS)
-    if (!data.mapUrl) return null;
-    const imgResp = await fetch(data.mapUrl);
-    if (!imgResp.ok) return null;
-
-    const imgBlob = await imgResp.blob();
-    return new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(imgBlob);
-    });
+    // Fallback: URL won't work in react-pdf (CORS), so skip
+    return null;
   } catch {
     // Map is optional — gracefully degrade
     return null;
@@ -1247,6 +1246,14 @@ async function fetchMapImage(
 }
 
 /* ── Page 3 (or inserted): Unit Type Summary — Comps vs Subject ──────────── */
+/* One mini-table per unit type. Y-axis = properties, columns = SF | $ | $/SF */
+
+const UT_COLS = [
+  { label: "Property", flex: 2.5 },
+  { label: "SF", flex: 1 },
+  { label: "$", flex: 1 },
+  { label: "$/SF", flex: 1 },
+];
 
 function UnitTypeSummaryPage(
   property: Property,
@@ -1260,75 +1267,60 @@ function UnitTypeSummaryPage(
   const active = activeComps(comps);
   const unitTypes = collectFloorPlanTypes(subjectProperty, active, rentRoll);
 
-  // Truncate comp names to keep columns narrow
-  const compLabel = (c: Comp) => c.name.length > 18 ? c.name.slice(0, 16) + "…" : c.name;
-
-  // Build column definitions dynamically: Unit Type | Subject Rent | Subject PSF | Comp1 Rent | Comp1 PSF | …
-  const cols: { label: string; flex: number }[] = [
-    { label: "Unit Type", flex: 1.3 },
-    { label: "Subject Rent", flex: 0.9 },
-    { label: "Subject PSF", flex: 0.7 },
-  ];
-  for (const c of active) {
-    cols.push({ label: compLabel(c) + " Rent", flex: 0.9 });
-    cols.push({ label: compLabel(c) + " PSF", flex: 0.7 });
-  }
-  // Market avg columns at the end
-  cols.push({ label: "Mkt Avg Rent", flex: 0.9 });
-  cols.push({ label: "Mkt Avg PSF", flex: 0.7 });
-
-  // If too many comps, use a smaller font to fit
-  const tinyFont = active.length > 4 ? 5.5 : 6;
-
-  const rows = unitTypes.map((ut, idx) => {
+  const tables = unitTypes.flatMap((ut) => {
     const subj = subjectRentForType(ut, subjectProperty, rentRoll);
     const mkt = marketStats(active, ut);
 
-    const values: string[] = [ut];
-    values.push(fmtCurrency(subj.rent));
-    values.push(subj.psf != null ? "$" + subj.psf.toFixed(2) : "—");
+    // Build rows: Subject first, then each comp, then market avg
+    interface Row { name: string; sqft: number | null; rent: number | null; psf: number | null; isSubject?: boolean }
+    const rows: Row[] = [];
+
+    rows.push({ name: property.name + " (Subject)", sqft: subj.sqft, rent: subj.rent, psf: subj.psf, isSubject: true });
 
     for (const c of active) {
       const fp = findPlan(c.floorPlans, ut);
-      values.push(fp?.rent != null ? fmtCurrency(fp.rent) : "—");
-      values.push(fp?.psf != null ? "$" + fp.psf.toFixed(2) : "—");
+      rows.push({
+        name: c.name,
+        sqft: fp?.sqft ?? null,
+        rent: fp?.rent ?? null,
+        psf: fp?.psf ?? null,
+      });
     }
-    values.push(fmtCurrency(mkt.avg));
-    values.push(mkt.avgPsf != null ? "$" + mkt.avgPsf.toFixed(2) : "—");
 
-    // Color-code the diff between subject and market avg
-    const diffDollar =
-      subj.rent != null && mkt.avg != null ? subj.rent - mkt.avg : null;
+    // Market average row
+    const mktSqfts = active.map((c) => findPlan(c.floorPlans, ut)?.sqft).filter((v): v is number => v != null);
+    const mktAvgSqft = mktSqfts.length > 0 ? mktSqfts.reduce((a, b) => a + b, 0) / mktSqfts.length : null;
+    rows.push({ name: "Market Average", sqft: mktAvgSqft, rent: mkt.avg, psf: mkt.avgPsf });
 
-    const bg = idx % 2 === 1 ? ROW_ALT : WHITE;
-    return el(
-      View,
-      { key: String(idx), style: { ...s.tableRow, backgroundColor: bg } },
-      ...cols.map((col, i) => {
-        let color = NAVY;
-        // Color subject rent vs market avg (show green if above, red if below)
-        if (i === 1 && diffDollar != null) color = diffColor(diffDollar);
+    const fmtSqft = (v: number | null) => v != null ? Math.round(v).toLocaleString("en-US") : "—";
+    const fmtPsfShort = (v: number | null) => v != null ? "$" + v.toFixed(2) : "—";
+
+    return [
+      // Unit type label
+      el(View, { key: ut + "-label", style: { marginTop: 6, marginBottom: 2 } },
+        el(Text, { style: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: BLUE } }, ut),
+      ),
+      // Header
+      tableHeaderRow(UT_COLS),
+      // Data rows
+      ...rows.map((r, idx) => {
+        const bg = r.isSubject ? "#eff6ff" : idx % 2 === 0 ? WHITE : ROW_ALT;
+        const nameStyle = r.isSubject
+          ? { ...s.tableCell, fontFamily: "Helvetica-Bold" as const, color: BLUE }
+          : r.name === "Market Average"
+            ? { ...s.tableCell, fontFamily: "Helvetica-Bold" as const, color: NAVY }
+            : s.tableCell;
         return el(
           View,
-          { key: String(i), style: { flex: col.flex } },
-          el(Text, { style: { ...s.tableCell, fontSize: tinyFont, color } }, values[i] ?? ""),
+          { key: ut + "-" + idx, style: { ...s.tableRow, backgroundColor: bg } },
+          el(View, { style: { flex: UT_COLS[0].flex } }, el(Text, { style: nameStyle }, r.name)),
+          el(View, { style: { flex: UT_COLS[1].flex } }, el(Text, { style: s.tableCell }, fmtSqft(r.sqft))),
+          el(View, { style: { flex: UT_COLS[2].flex } }, el(Text, { style: s.tableCell }, fmtCurrency(r.rent))),
+          el(View, { style: { flex: UT_COLS[3].flex } }, el(Text, { style: s.tableCell }, fmtPsfShort(r.psf))),
         );
       }),
-    );
+    ];
   });
-
-  // Build a custom header that uses the same tiny font
-  const headerRow = el(
-    View,
-    { style: s.tableHeader },
-    ...cols.map((col, i) =>
-      el(
-        View,
-        { key: String(i), style: { flex: col.flex } },
-        el(Text, { style: { ...s.tableHeaderText, fontSize: tinyFont } }, col.label),
-      ),
-    ),
-  );
 
   return el(
     Page,
@@ -1337,8 +1329,7 @@ function UnitTypeSummaryPage(
     Header(property, preparedBy, surveyDate),
 
     el(Text, { style: s.sectionTitleCompact }, "Unit Type Summary — Subject vs Comps"),
-    headerRow,
-    ...rows,
+    ...tables,
 
     Footer(preparedBy, surveyDate, pageNum),
   );

@@ -147,11 +147,6 @@ export default function Home() {
         </button>
       </div>
 
-      {/* TODO: remove this banner once Ryan confirms updates are live */}
-      <div className="mb-4 rounded-lg bg-yellow-100 border border-yellow-300 px-4 py-2 text-sm text-yellow-800 font-medium">
-        Code updated — if you see this, the build is live.
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {properties.map((property) => (
           <div
