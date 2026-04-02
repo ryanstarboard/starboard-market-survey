@@ -1224,9 +1224,12 @@ async function fetchMapImage(
     if (!resp.ok) return null;
 
     const data = await resp.json();
-    if (!data.mapUrl) return null;
 
-    // Fetch the actual image and convert to base64 data URI
+    // Prefer server-side base64 (avoids CORS issues with Google Static Maps)
+    if (data.mapDataUri) return data.mapDataUri;
+
+    // Fallback: try fetching the URL from the browser (may hit CORS)
+    if (!data.mapUrl) return null;
     const imgResp = await fetch(data.mapUrl);
     if (!imgResp.ok) return null;
 
@@ -1241,6 +1244,104 @@ async function fetchMapImage(
     // Map is optional — gracefully degrade
     return null;
   }
+}
+
+/* ── Page 3 (or inserted): Unit Type Summary — Comps vs Subject ──────────── */
+
+function UnitTypeSummaryPage(
+  property: Property,
+  subjectProperty: SubjectProperty | null,
+  comps: Comp[],
+  rentRoll: RentRollSummary | null,
+  preparedBy: string,
+  surveyDate: string,
+  pageNum: number,
+) {
+  const active = activeComps(comps);
+  const unitTypes = collectFloorPlanTypes(subjectProperty, active, rentRoll);
+
+  // Truncate comp names to keep columns narrow
+  const compLabel = (c: Comp) => c.name.length > 18 ? c.name.slice(0, 16) + "…" : c.name;
+
+  // Build column definitions dynamically: Unit Type | Subject Rent | Subject PSF | Comp1 Rent | Comp1 PSF | …
+  const cols: { label: string; flex: number }[] = [
+    { label: "Unit Type", flex: 1.3 },
+    { label: "Subject Rent", flex: 0.9 },
+    { label: "Subject PSF", flex: 0.7 },
+  ];
+  for (const c of active) {
+    cols.push({ label: compLabel(c) + " Rent", flex: 0.9 });
+    cols.push({ label: compLabel(c) + " PSF", flex: 0.7 });
+  }
+  // Market avg columns at the end
+  cols.push({ label: "Mkt Avg Rent", flex: 0.9 });
+  cols.push({ label: "Mkt Avg PSF", flex: 0.7 });
+
+  // If too many comps, use a smaller font to fit
+  const tinyFont = active.length > 4 ? 5.5 : 6;
+
+  const rows = unitTypes.map((ut, idx) => {
+    const subj = subjectRentForType(ut, subjectProperty, rentRoll);
+    const mkt = marketStats(active, ut);
+
+    const values: string[] = [ut];
+    values.push(fmtCurrency(subj.rent));
+    values.push(subj.psf != null ? "$" + subj.psf.toFixed(2) : "—");
+
+    for (const c of active) {
+      const fp = findPlan(c.floorPlans, ut);
+      values.push(fp?.rent != null ? fmtCurrency(fp.rent) : "—");
+      values.push(fp?.psf != null ? "$" + fp.psf.toFixed(2) : "—");
+    }
+    values.push(fmtCurrency(mkt.avg));
+    values.push(mkt.avgPsf != null ? "$" + mkt.avgPsf.toFixed(2) : "—");
+
+    // Color-code the diff between subject and market avg
+    const diffDollar =
+      subj.rent != null && mkt.avg != null ? subj.rent - mkt.avg : null;
+
+    const bg = idx % 2 === 1 ? ROW_ALT : WHITE;
+    return el(
+      View,
+      { key: String(idx), style: { ...s.tableRow, backgroundColor: bg } },
+      ...cols.map((col, i) => {
+        let color = NAVY;
+        // Color subject rent vs market avg (show green if above, red if below)
+        if (i === 1 && diffDollar != null) color = diffColor(diffDollar);
+        return el(
+          View,
+          { key: String(i), style: { flex: col.flex } },
+          el(Text, { style: { ...s.tableCell, fontSize: tinyFont, color } }, values[i] ?? ""),
+        );
+      }),
+    );
+  });
+
+  // Build a custom header that uses the same tiny font
+  const headerRow = el(
+    View,
+    { style: s.tableHeader },
+    ...cols.map((col, i) =>
+      el(
+        View,
+        { key: String(i), style: { flex: col.flex } },
+        el(Text, { style: { ...s.tableHeaderText, fontSize: tinyFont } }, col.label),
+      ),
+    ),
+  );
+
+  return el(
+    Page,
+    { size: "LETTER", orientation: "landscape", style: s.pageCompact },
+
+    Header(property, preparedBy, surveyDate),
+
+    el(Text, { style: s.sectionTitleCompact }, "Unit Type Summary — Subject vs Comps"),
+    headerRow,
+    ...rows,
+
+    Footer(preparedBy, surveyDate, pageNum),
+  );
 }
 
 /* ── Document builders ───────────────────────────────────────────────────── */
@@ -1261,6 +1362,8 @@ function SummaryDocument(
     CoverPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
     // Page 2: Executive summary tables
     ExecutiveSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate),
+    // Page 3: Unit type summary — comps vs subject
+    UnitTypeSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, 3),
   );
 }
 
@@ -1282,11 +1385,13 @@ function DetailDocument(
     CoverPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, mapDataUri),
     // Page 2: Executive summary tables
     ExecutiveSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate),
-    // Page 3: Subject property detail (compact, one-pager)
-    SubjectDetailPage(property, subjectProperty, preparedBy, surveyDate, 3),
-    // Pages 4+: One page per non-excluded comp (compact, one-pager each)
+    // Page 3: Unit type summary — comps vs subject
+    UnitTypeSummaryPage(property, subjectProperty, comps, rentRoll, preparedBy, surveyDate, 3),
+    // Page 4: Subject property detail (compact, one-pager)
+    SubjectDetailPage(property, subjectProperty, preparedBy, surveyDate, 4),
+    // Pages 5+: One page per non-excluded comp (compact, one-pager each)
     ...active.map((comp, idx) =>
-      CompDetailPage(property, comp, preparedBy, surveyDate, 4 + idx),
+      CompDetailPage(property, comp, preparedBy, surveyDate, 5 + idx),
     ),
   );
 }
@@ -1316,9 +1421,17 @@ async function resolveMapImage(
 ): Promise<string | null> {
   const active = activeComps(comps);
   const subjectAddr = property.address + ", " + property.city;
-  const compAddrs = active.map(
-    (c) => c.address + (c.cityState ? ", " + c.cityState : ""),
-  );
+  // Always ensure city/state context — fall back to subject property's city
+  // to prevent geocoding to wrong continent
+  const fallbackCity = property.city || "";
+  const compAddrs = active.map((c) => {
+    const addr = (c.address || "").trim();
+    if (!addr) return "";
+    const city = (c.cityState || "").trim();
+    if (city) return `${addr}, ${city}`;
+    if (fallbackCity) return `${addr}, ${fallbackCity}`;
+    return addr;
+  }).filter(Boolean);
   return fetchMapImage(subjectAddr, compAddrs);
 }
 

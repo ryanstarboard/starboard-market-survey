@@ -48,5 +48,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 
-  return res.status(200).json({ mapUrl });
+  // Fetch the image server-side and return as base64 data URI
+  // (browser fetch of Google Static Maps hits CORS restrictions)
+  try {
+    const imgResp = await fetch(mapUrl);
+    if (!imgResp.ok) {
+      return res.status(200).json({ mapUrl, mapDataUri: null });
+    }
+    const arrayBuf = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(arrayBuf).toString("base64");
+    const contentType = imgResp.headers.get("content-type") || "image/png";
+    const dataUri = `data:${contentType};base64,${base64}`;
+    return res.status(200).json({ mapUrl, mapDataUri: dataUri });
+  } catch {
+    // Fall back to URL-only if server-side fetch fails
+    return res.status(200).json({ mapUrl, mapDataUri: null });
+  }
 }

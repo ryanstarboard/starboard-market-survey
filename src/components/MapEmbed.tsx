@@ -16,14 +16,15 @@ export function MapEmbed({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Filter out comps with no address, append cityState for better geocoding
+  // Filter out comps with no address, always append cityState for reliable geocoding.
+  // Without city/state, Google can resolve a bare street address to the wrong continent.
   const validComps = comps.filter((c) => c.address && c.address.trim());
   const compAddresses = validComps.map((c) => {
     const addr = c.address.trim();
-    // If address doesn't already contain city/state info, append it
-    if (c.cityState && !addr.includes(",")) {
-      return `${addr}, ${c.cityState}`;
-    }
+    const city = (c.cityState || "").trim();
+    // Always append cityState if available — a comma in the address (apt/suite)
+    // does NOT mean it already has a city.
+    if (city) return `${addr}, ${city}`;
     return addr;
   }).join("|");
   const compNames = validComps.map((c) => c.name).join("|");
