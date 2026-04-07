@@ -4,6 +4,7 @@ import type { FloorPlan } from "../lib/types";
 interface FloorPlanTableProps {
   floorPlans: FloorPlan[];
   onChange: (plans: FloorPlan[]) => void;
+  unitTypes?: string[];
 }
 
 function formatCurrency(val: number | null): string {
@@ -26,7 +27,7 @@ interface ColumnDef {
   inputType?: string;
 }
 
-export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
+export function FloorPlanTable({ floorPlans, onChange, unitTypes }: FloorPlanTableProps) {
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
 
   const updatePlan = (index: number, field: keyof FloorPlan, raw: string) => {
@@ -125,6 +126,29 @@ export function FloorPlanTable({ floorPlans, onChange }: FloorPlanTableProps) {
                 const rawValue = plan[col.key as keyof FloorPlan];
 
                 if (isEditing) {
+                  // Unit type dropdown when unitTypes are available
+                  if (col.key === "type" && unitTypes && unitTypes.length > 0) {
+                    return (
+                      <td key={col.key} className="px-1 py-0.5">
+                        <select
+                          autoFocus
+                          className="w-full px-1 py-0.5 border border-blue-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                          defaultValue={rawValue !== null && rawValue !== undefined ? String(rawValue) : ""}
+                          onChange={(e) => {
+                            updatePlan(rowIdx, "type", e.target.value);
+                            setEditingCell(null);
+                          }}
+                          onBlur={() => setEditingCell(null)}
+                        >
+                          <option value="">Select type...</option>
+                          {unitTypes.map((ut) => (
+                            <option key={ut} value={ut}>{ut}</option>
+                          ))}
+                        </select>
+                      </td>
+                    );
+                  }
+
                   return (
                     <td key={col.key} className="px-1 py-0.5">
                       <input

@@ -26,27 +26,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "Subject address is required" });
   }
 
-  // Build Google Maps Static API URL
-  const params = new URLSearchParams();
-  params.set("size", "800x400");
-  params.set("scale", "2");
-  params.set("maptype", "roadmap");
-  params.set("key", apiKey);
+  // Build markers manually — URLSearchParams double-encodes pipe-delimited
+  // marker strings, so we construct the query string by hand.
+  const subjectMarker = `color:red|label:S|${subject.address}`;
 
-  // Subject marker — red, label "S"
-  const subjectMarker = `color:red|label:S|${encodeURIComponent(subject.address)}`;
-  params.append("markers", subjectMarker);
-
-  // Comp markers — blue, labeled 1-6
   const labels = "123456";
   const activeComps = (comps || []).slice(0, 6);
-  for (let i = 0; i < activeComps.length; i++) {
+  const compMarkers = activeComps.map((c, i) => {
     const label = labels[i] || String(i + 1);
-    const compMarker = `color:blue|label:${label}|${encodeURIComponent(activeComps[i].address)}`;
-    params.append("markers", compMarker);
-  }
+    return `color:blue|label:${label}|${c.address}`;
+  });
 
-  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+  const baseParams = new URLSearchParams();
+  baseParams.set("size", "800x400");
+  baseParams.set("scale", "2");
+  baseParams.set("maptype", "roadmap");
+  baseParams.set("key", apiKey);
+
+  const markerParams = [subjectMarker, ...compMarkers]
+    .map((m) => "markers=" + encodeURIComponent(m))
+    .join("&");
+
+  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?${baseParams.toString()}&${markerParams}`;
 
   // Fetch the image server-side and return as base64 data URI
   // (browser fetch of Google Static Maps hits CORS restrictions)

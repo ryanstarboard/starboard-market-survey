@@ -6,6 +6,7 @@ interface CompCardProps {
   comp: Comp;
   onChange: (updated: Comp) => void;
   onExclude: () => void;
+  unitTypes?: string[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -334,7 +335,7 @@ function OtherFeesEditor({
 
 // ── CompCard ─────────────────────────────────────────────────────────────────
 
-export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
+export function CompCard({ comp, onChange, onExclude, unitTypes }: CompCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const update = <K extends keyof Comp>(field: K, value: Comp[K]) => {
@@ -474,6 +475,7 @@ export function CompCard({ comp, onChange, onExclude }: CompCardProps) {
         <FloorPlanTable
           floorPlans={comp.floorPlans}
           onChange={(plans) => update("floorPlans", plans)}
+          unitTypes={unitTypes}
         />
 
         {/* ── 4. Cost to Rent ── */}

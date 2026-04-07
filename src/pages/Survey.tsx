@@ -13,7 +13,9 @@ const STAGES = ["Rent Roll", "Subject Property", "Comp Data", "Market Summary", 
 
 const SURVEY_STORAGE_PREFIX = "starboard_survey_";
 
-function saveSurvey(propertyId: string, state: SurveyState) {
+// ── localStorage helpers (fallback when Blob API is unavailable) ────────────
+
+function saveSurveyLocal(propertyId: string, state: SurveyState) {
   try {
     localStorage.setItem(SURVEY_STORAGE_PREFIX + propertyId, JSON.stringify(state));
   } catch {
@@ -21,7 +23,7 @@ function saveSurvey(propertyId: string, state: SurveyState) {
   }
 }
 
-function loadSurvey(propertyId: string): SurveyState | null {
+function loadSurveyLocal(propertyId: string): SurveyState | null {
   try {
     const raw = localStorage.getItem(SURVEY_STORAGE_PREFIX + propertyId);
     if (raw) return JSON.parse(raw) as SurveyState;
@@ -35,8 +37,66 @@ export function hasSavedSurvey(propertyId: string): boolean {
   return localStorage.getItem(SURVEY_STORAGE_PREFIX + propertyId) !== null;
 }
 
-function clearSavedSurvey(propertyId: string) {
+function clearSavedSurveyLocal(propertyId: string) {
   localStorage.removeItem(SURVEY_STORAGE_PREFIX + propertyId);
+}
+
+// ── Server persistence (Vercel Blob) — shared across all users ──────────────
+
+async function saveSurveyRemote(propertyId: string, state: SurveyState): Promise<boolean> {
+  try {
+    const resp = await fetch("/api/surveys/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId, state }),
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function loadSurveyRemote(propertyId: string): Promise<SurveyState | null> {
+  try {
+    const resp = await fetch(`/api/surveys/load?propertyId=${encodeURIComponent(propertyId)}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.state ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Combined save/load: API primary, localStorage fallback ──────────────────
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function saveSurvey(propertyId: string, state: SurveyState) {
+  // Always write to localStorage immediately (instant, offline-safe)
+  saveSurveyLocal(propertyId, state);
+
+  // Debounce remote save to avoid hammering API on every keystroke
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveSurveyRemote(propertyId, state);
+  }, 2000);
+}
+
+async function loadSurvey(propertyId: string): Promise<SurveyState | null> {
+  // Try remote first (shared across users), fall back to localStorage
+  const remote = await loadSurveyRemote(propertyId);
+  if (remote) {
+    // Sync to localStorage so it's available offline
+    saveSurveyLocal(propertyId, remote);
+    return remote;
+  }
+  return loadSurveyLocal(propertyId);
+}
+
+function clearSavedSurvey(propertyId: string) {
+  clearSavedSurveyLocal(propertyId);
+  // Note: does not delete from remote — surveys are append-only on the server.
+  // A cleared survey will be overwritten on next save.
 }
 
 type SurveyAction =
@@ -48,7 +108,8 @@ type SurveyAction =
   | { type: "SET_COMPS"; comps: Comp[] }
   | { type: "SET_SUBJECT_PROPERTY"; subjectProperty: SubjectProperty }
   | { type: "SET_FIELD"; field: "preparedBy" | "surveyDate" | "comments"; value: string }
-  | { type: "CLEAR_SURVEY"; propertyId: string };
+  | { type: "CLEAR_SURVEY"; propertyId: string }
+  | { type: "LOAD_STATE"; state: SurveyState };
 
 function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
   switch (action.type) {
@@ -86,6 +147,8 @@ function surveyReducer(state: SurveyState, action: SurveyAction): SurveyState {
         surveyDate: new Date().toISOString().slice(0, 10),
         comments: "",
       };
+    case "LOAD_STATE":
+      return action.state;
     default:
       return state;
   }
@@ -167,45 +230,57 @@ export default function Survey() {
   const property = getProperties().find((p) => p.id === propertyId) ?? null;
   const pid = propertyId || "";
 
-  // Track whether we resumed from saved data
-  const didResume = useRef(false);
   const [showResumed, setShowResumed] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const skipNextRemoteSave = useRef(false);
 
+  const emptyState = (id: string): SurveyState => ({
+    propertyId: id,
+    stage: 0,
+    rentRoll: null,
+    rrTab: "all",
+    comps: [],
+    subjectProperty: null,
+    preparedBy: "",
+    surveyDate: new Date().toISOString().slice(0, 10),
+    comments: "",
+  });
+
+  // Sync init from localStorage (instant, no flicker)
   const [state, dispatch] = useReducer(
     surveyReducer,
     pid,
     (id): SurveyState => {
-      const saved = loadSurvey(id);
-      if (saved) {
-        didResume.current = true;
-      }
-      return saved ?? {
-        propertyId: id,
-        stage: 0,
-        rentRoll: null,
-        rrTab: "all",
-        comps: [],
-        subjectProperty: null,
-        preparedBy: "",
-        surveyDate: new Date().toISOString().slice(0, 10),
-        comments: "",
-      };
+      return loadSurveyLocal(id) ?? emptyState(id);
     }
   );
 
-  // Show "Resumed from saved progress" toast on mount if we loaded saved data
+  // Async load from remote API on mount — overrides localStorage if newer data exists
   useEffect(() => {
-    if (didResume.current) {
-      setShowResumed(true);
-      const timer = setTimeout(() => setShowResumed(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, []);
+    let cancelled = false;
+    loadSurvey(pid).then((remote) => {
+      if (cancelled || !remote) return;
+      // Only apply if the remote data is for this property
+      if (remote.propertyId === pid) {
+        skipNextRemoteSave.current = true; // don't re-save what we just loaded
+        dispatch({ type: "LOAD_STATE", state: remote });
+        setShowResumed(true);
+        setTimeout(() => setShowResumed(false), 3000);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [pid]);
 
   // Auto-save on every state change
   useEffect(() => {
-    if (pid) saveSurvey(pid, state);
+    if (!pid) return;
+    if (skipNextRemoteSave.current) {
+      // Still save to localStorage, but skip the debounced remote save
+      saveSurveyLocal(pid, state);
+      skipNextRemoteSave.current = false;
+      return;
+    }
+    saveSurvey(pid, state);
   }, [pid, state]);
 
   const handleSaveProgress = useCallback(() => {

@@ -483,6 +483,7 @@ export default function CompData({ comps, onCompsChange, property, rentRoll }: C
             comp={comp}
             onChange={handleCompChange}
             onExclude={() => handleExclude(comp.id)}
+            unitTypes={rentRoll?.byType.map((bt) => bt.type)}
           />
         ))}
       </div>
