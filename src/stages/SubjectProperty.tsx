@@ -417,6 +417,7 @@ export default function SubjectPropertyStage({
         <FloorPlanTable
           floorPlans={sp.floorPlans}
           onChange={(plans) => update("floorPlans", plans)}
+          unitTypes={rentRoll?.byType.map((bt) => bt.type)}
         />
 
         {/* Cost to Rent */}
