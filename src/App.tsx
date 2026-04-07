@@ -2,8 +2,13 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Survey from "./pages/Survey";
 
-const APP_VERSION = "1.1.0";
-const APP_UPDATED = "2026-04-07 14:00";
+declare const __BUILD_TIME__: string;
+
+const APP_VERSION = "1.2.0";
+const APP_UPDATED = new Date(__BUILD_TIME__).toLocaleString("en-US", {
+  month: "short", day: "numeric", year: "numeric",
+  hour: "numeric", minute: "2-digit",
+});
 
 function App() {
   return (

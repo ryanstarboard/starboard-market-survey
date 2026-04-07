@@ -1,6 +1,19 @@
 import { useState } from "react";
 import type { FloorPlan } from "../lib/types";
 
+const STANDARD_UNIT_TYPES = [
+  "Studio",
+  "1BR/1BA",
+  "2BR/1BA",
+  "2BR/2BA",
+  "3BR/1BA",
+  "3BR/2BA",
+  "3BR/3BA",
+  "4BR/2BA",
+  "4BR/3BA",
+  "4BR/4BA",
+];
+
 interface FloorPlanTableProps {
   floorPlans: FloorPlan[];
   onChange: (plans: FloorPlan[]) => void;
@@ -29,6 +42,13 @@ interface ColumnDef {
 
 export function FloorPlanTable({ floorPlans, onChange, unitTypes }: FloorPlanTableProps) {
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
+
+  // Merge standard types with any rent-roll-specific types (deduplicated, ordered)
+  const allUnitTypes = (() => {
+    const set = new Set(STANDARD_UNIT_TYPES);
+    if (unitTypes) unitTypes.forEach((t) => set.add(t));
+    return Array.from(set);
+  })();
 
   const updatePlan = (index: number, field: keyof FloorPlan, raw: string) => {
     const updated = [...floorPlans];
@@ -125,8 +145,8 @@ export function FloorPlanTable({ floorPlans, onChange, unitTypes }: FloorPlanTab
 
                 const rawValue = plan[col.key as keyof FloorPlan];
 
-                // Unit type — always show dropdown when unitTypes are available
-                if (col.key === "type" && unitTypes && unitTypes.length > 0) {
+                // Unit type — always show dropdown with standard bed/bath options
+                if (col.key === "type") {
                   return (
                     <td key={col.key} className="px-1 py-0.5">
                       <select
@@ -137,7 +157,7 @@ export function FloorPlanTable({ floorPlans, onChange, unitTypes }: FloorPlanTab
                         }}
                       >
                         <option value="">Select type...</option>
-                        {unitTypes.map((ut) => (
+                        {allUnitTypes.map((ut) => (
                           <option key={ut} value={ut}>{ut}</option>
                         ))}
                       </select>
