@@ -125,30 +125,27 @@ export function FloorPlanTable({ floorPlans, onChange, unitTypes }: FloorPlanTab
 
                 const rawValue = plan[col.key as keyof FloorPlan];
 
-                if (isEditing) {
-                  // Unit type dropdown when unitTypes are available
-                  if (col.key === "type" && unitTypes && unitTypes.length > 0) {
-                    return (
-                      <td key={col.key} className="px-1 py-0.5">
-                        <select
-                          autoFocus
-                          className="w-full px-1 py-0.5 border border-blue-400 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                          defaultValue={rawValue !== null && rawValue !== undefined ? String(rawValue) : ""}
-                          onChange={(e) => {
-                            updatePlan(rowIdx, "type", e.target.value);
-                            setEditingCell(null);
-                          }}
-                          onBlur={() => setEditingCell(null)}
-                        >
-                          <option value="">Select type...</option>
-                          {unitTypes.map((ut) => (
-                            <option key={ut} value={ut}>{ut}</option>
-                          ))}
-                        </select>
-                      </td>
-                    );
-                  }
+                // Unit type — always show dropdown when unitTypes are available
+                if (col.key === "type" && unitTypes && unitTypes.length > 0) {
+                  return (
+                    <td key={col.key} className="px-1 py-0.5">
+                      <select
+                        className="w-full px-1 py-1 border border-slate-200 rounded text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                        value={rawValue !== null && rawValue !== undefined ? String(rawValue) : ""}
+                        onChange={(e) => {
+                          updatePlan(rowIdx, "type", e.target.value);
+                        }}
+                      >
+                        <option value="">Select type...</option>
+                        {unitTypes.map((ut) => (
+                          <option key={ut} value={ut}>{ut}</option>
+                        ))}
+                      </select>
+                    </td>
+                  );
+                }
 
+                if (isEditing) {
                   return (
                     <td key={col.key} className="px-1 py-0.5">
                       <input
